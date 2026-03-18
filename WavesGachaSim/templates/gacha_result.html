@@ -159,6 +159,19 @@
             opacity: 0.3;
         }
 
+        /* 头像 (右上角) */
+        .user-avatar {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 60px;
+            height: 60px;
+            border-radius: 8px;
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            z-index: 10;
+            object-fit: cover;
+        }
+
         /* 卡池名称 */
         .pool-name {
             position: absolute;
@@ -212,6 +225,11 @@
     <div class="container {{ 'no-bg' if not bg_image else '' }}">
         <!-- 卡池名称 -->
         <div class="pool-name">{{ pool_name }}</div>
+
+        <!-- 头像 (右上角) -->
+        {% if avatar %}
+        <img class="user-avatar" src="{{ avatar }}">
+        {% endif %}
 
         <!-- 卡片区域 -->
         <div id="gacha" class="{{ 'single' if draw_type == 1 else '' }}">

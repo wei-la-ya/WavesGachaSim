@@ -336,6 +336,7 @@ async def _do_draw(
             signature_code=signature_code,
             draw_type=count,
             nickname=ev.sender.get('nickname', '') if ev.sender else '',
+            avatar=ev.sender.get('avatar', '') if ev.sender else '',
         )
 
         # 检查文本回退配置

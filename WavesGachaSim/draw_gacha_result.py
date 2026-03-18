@@ -342,6 +342,7 @@ async def render_gacha_result(
     signature_code: str = "",
     draw_type: int = 10,
     nickname: str = "",
+    avatar: str = "",
 ) -> Optional[bytes]:
     """
     渲染抽卡结果为图片
@@ -352,6 +353,7 @@ async def render_gacha_result(
         signature_code: 用户特征码
         draw_type: 抽卡类型 (1=单抽, 10=十连)
         nickname: 用户昵称
+        avatar: 用户头像URL
 
     Returns:
         图片 bytes, 或 None (渲染失败)
@@ -420,6 +422,7 @@ async def render_gacha_result(
         "bg_image": bg_image,
         "signature_code": signature_code,
         "nickname": nickname,
+        "avatar": avatar,
         "weapon_type_icons": weapon_type_icons,
         "element_type_icons": element_type_icons,
         "card_frames": card_frames,
