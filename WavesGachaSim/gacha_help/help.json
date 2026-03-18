@@ -1,0 +1,105 @@
+{
+  "限定抽卡": {
+    "desc": "模拟限定卡池抽卡",
+    "data": [
+      {
+        "name": "ww抽卡",
+        "desc": "限定角色池十连抽",
+        "eg": "ww抽卡",
+        "need_ck": false,
+        "need_sk": false,
+        "need_admin": false
+      },
+      {
+        "name": "ww抽卡武器",
+        "desc": "限定武器池十连抽",
+        "eg": "ww抽卡武器",
+        "need_ck": false,
+        "need_sk": false,
+        "need_admin": false
+      }
+    ]
+  },
+  "常驻抽卡": {
+    "desc": "模拟常驻卡池抽卡",
+    "data": [
+      {
+        "name": "ww抽卡常驻",
+        "desc": "常驻角色池十连抽",
+        "eg": "ww抽卡常驻",
+        "need_ck": false,
+        "need_sk": false,
+        "need_admin": false
+      },
+      {
+        "name": "ww抽卡常驻武器",
+        "desc": "常驻武器池十连抽",
+        "eg": "ww抽卡常驻武器",
+        "need_ck": false,
+        "need_sk": false,
+        "need_admin": false
+      }
+    ]
+  },
+  "卡池管理": {
+    "desc": "管理和查看卡池状态",
+    "data": [
+      {
+        "name": "ww切换卡池",
+        "desc": "切换限定池（编号或名称）",
+        "eg": "ww切换卡池 1",
+        "need_ck": false,
+        "need_sk": false,
+        "need_admin": false
+      },
+      {
+        "name": "ww卡池状态",
+        "desc": "查看各池保底进度",
+        "eg": "ww卡池状态",
+        "need_ck": false,
+        "need_sk": false,
+        "need_admin": false
+      },
+      {
+        "name": "ww抽卡统计",
+        "desc": "查看5星出货历史",
+        "eg": "ww抽卡统计",
+        "need_ck": false,
+        "need_sk": false,
+        "need_admin": false
+      },
+      {
+        "name": "ww抽卡概率",
+        "desc": "查看概率说明",
+        "eg": "ww抽卡概率",
+        "need_ck": false,
+        "need_sk": false,
+        "need_admin": false
+      },
+      {
+        "name": "ww更新卡池",
+        "desc": "强制从API刷新卡池数据",
+        "eg": "ww更新卡池",
+        "need_ck": false,
+        "need_sk": false,
+        "need_admin": false
+      },
+      {
+        "name": "ww模拟绑定",
+        "desc": "绑定或查看特征码",
+        "eg": "ww模拟绑定 123456789",
+        "need_ck": false,
+        "need_sk": false,
+        "need_admin": false
+      },
+      {
+        "name": "ww抽卡帮助",
+        "desc": "查看帮助信息",
+        "eg": "ww抽卡帮助",
+        "need_ck": false,
+        "need_sk": false,
+        "need_admin": false
+      }
+    ]
+  }
+}

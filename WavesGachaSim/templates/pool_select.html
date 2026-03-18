@@ -1,0 +1,219 @@
+<!doctype html>
+<html>
+<head>
+    <meta http-equiv="content-type" content="text/html;charset=utf-8" />
+    {% if font_css_url %}
+    <link rel="stylesheet" href="{{ font_css_url }}">
+    {% endif %}
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            width: 1200px;
+            margin: 0;
+            overflow: hidden;
+            font-family: "HYWenHei", "Microsoft YaHei", "PingFang SC", sans-serif;
+            background: linear-gradient(180deg, #0d0d1a 0%, #1a1a2e 40%, #16213e 100%);
+            color: #ffffff;
+        }
+
+        .container {
+            padding: 40px 50px;
+        }
+
+        /* 标题 */
+        .title {
+            text-align: center;
+            font-size: 36px;
+            font-weight: bold;
+            color: #d3bc8e;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            text-align: center;
+            font-size: 16px;
+            color: rgba(255,255,255,0.5);
+            margin-bottom: 35px;
+        }
+
+        /* 分类标题 */
+        .category-title {
+            font-size: 22px;
+            font-weight: bold;
+            color: #d3bc8e;
+            margin-bottom: 18px;
+            padding-left: 10px;
+            border-left: 4px solid #d3bc8e;
+        }
+
+        /* 卡池网格 */
+        .pool-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 35px;
+        }
+
+        /* 卡池卡片 */
+        .pool-card {
+            width: 260px;
+            border-radius: 12px;
+            overflow: hidden;
+            background: rgba(255,255,255,0.06);
+            border: 2px solid rgba(255,255,255,0.1);
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .pool-card.selected {
+            border-color: #d3bc8e;
+            box-shadow: 0 0 20px rgba(211,188,142,0.3);
+        }
+
+        /* 选中标记 */
+        .pool-card.selected::after {
+            content: "当前";
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #d3bc8e;
+            color: #1a1a2e;
+            font-size: 12px;
+            font-weight: bold;
+            padding: 3px 10px;
+            border-radius: 10px;
+            z-index: 10;
+        }
+
+        /* 封面图 */
+        .pool-cover {
+            width: 100%;
+            height: 140px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .pool-cover-placeholder {
+            width: 100%;
+            height: 140px;
+            background: linear-gradient(135deg, #2a2a4a 0%, #1a1a3e 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            opacity: 0.4;
+        }
+
+        /* 卡片信息 */
+        .pool-info {
+            padding: 12px 14px;
+        }
+
+        .pool-number {
+            display: inline-block;
+            background: rgba(211,188,142,0.2);
+            color: #d3bc8e;
+            font-size: 13px;
+            font-weight: bold;
+            padding: 2px 8px;
+            border-radius: 6px;
+            margin-bottom: 6px;
+        }
+
+        .pool-name {
+            font-size: 15px;
+            font-weight: bold;
+            color: #ffffff;
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .pool-up {
+            font-size: 13px;
+            color: rgba(255,255,255,0.6);
+        }
+
+        .pool-up .up-label {
+            color: #e8a642;
+            font-weight: bold;
+        }
+
+        .pool-time {
+            font-size: 11px;
+            color: rgba(255,255,255,0.35);
+            margin-top: 4px;
+        }
+
+        /* 底部提示 */
+        .footer-tip {
+            text-align: center;
+            font-size: 16px;
+            color: rgba(255,255,255,0.45);
+            margin-top: 10px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .footer-tip .cmd {
+            color: #d3bc8e;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="title">卡池选择</div>
+        <div class="subtitle">发送 ww切换卡池+编号 进行选择</div>
+
+        {% if char_pools %}
+        <div class="category-title">限定角色池</div>
+        <div class="pool-grid">
+            {% for pool in char_pools %}
+            <div class="pool-card {{ 'selected' if pool.id == selected_char_id else '' }}">
+                {% if pool.pic %}
+                <img class="pool-cover" src="{{ pool.pic }}">
+                {% else %}
+                <div class="pool-cover-placeholder">👤</div>
+                {% endif %}
+                <div class="pool-info">
+                    <div class="pool-number">{{ pool.index }}</div>
+                    <div class="pool-name">{{ pool.name }}</div>
+                    <div class="pool-up"><span class="up-label">UP</span> {{ pool.up5_names }}</div>
+                    <div class="pool-time">{{ pool.time_range }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if weapon_pools %}
+        <div class="category-title">限定武器池</div>
+        <div class="pool-grid">
+            {% for pool in weapon_pools %}
+            <div class="pool-card {{ 'selected' if pool.id == selected_weapon_id else '' }}">
+                {% if pool.pic %}
+                <img class="pool-cover" src="{{ pool.pic }}">
+                {% else %}
+                <div class="pool-cover-placeholder">🗡️</div>
+                {% endif %}
+                <div class="pool-info">
+                    <div class="pool-number">{{ pool.index }}</div>
+                    <div class="pool-name">{{ pool.name }}</div>
+                    <div class="pool-up"><span class="up-label">UP</span> {{ pool.up5_names }}</div>
+                    <div class="pool-time">{{ pool.time_range }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="footer-tip">
+            发送 <span class="cmd">ww切换卡池+编号</span> 选择卡池 · 选择后直到过期前一直有效
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,235 @@
+<!doctype html>
+<html>
+<head>
+    <meta http-equiv="content-type" content="text/html;charset=utf-8" />
+    {% if font_css_url %}
+    <link rel="stylesheet" href="{{ font_css_url }}">
+    {% endif %}
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        /* CSS 变量：精灵图资源只定义一次，所有卡片通过 class 引用 */
+        :root {
+            --bg-3: url("{{ card_frames.bg_3 }}");
+            --bg-4: url("{{ card_frames.bg_4 }}");
+            --bg-5: url("{{ card_frames.bg_5 }}");
+            --show-3: url("{{ card_frames.show_3 }}");
+            --show-4: url("{{ card_frames.show_4 }}");
+            --show-5: url("{{ card_frames.show_5 }}");
+            --bandiao: url("{{ card_frames.bandiao }}");
+        }
+
+        body {
+            width: 1920px;
+            height: 1080px;
+            margin: 0;
+            overflow: hidden;
+            font-family: "HYWenHei", "Microsoft YaHei", "PingFang SC", sans-serif;
+        }
+
+        .container {
+            width: 100%;
+            height: 100%;
+            background: url("{{ bg_image }}") no-repeat center center;
+            background-size: cover;
+            position: relative;
+        }
+
+        .container.no-bg {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 30%, #0f3460 60%, #1a1a2e 100%);
+        }
+
+        /* 卡片网格 */
+        #gacha {
+            display: grid;
+            grid-template-columns: repeat(5, 265px);
+            gap: 15px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        #gacha.single {
+            grid-template-columns: 265px;
+        }
+
+        /* 卡片容器 */
+        .frame {
+            position: relative;
+            width: 265px;
+            height: 380px;
+            overflow: visible;
+        }
+
+        /* 伪元素 + div 实现多层叠加，资源通过 CSS 变量引用（不重复 base64） */
+
+        /* 图层 1: 背景层 (bg_star) - 用 ::before */
+        .frame::before {
+            content: "";
+            position: absolute;
+            z-index: 1;
+            width: 120%;
+            height: 120%;
+            top: -10%;
+            left: -10%;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            pointer-events: none;
+        }
+        .frame[data-star="3"]::before { background-image: var(--bg-3); }
+        .frame[data-star="4"]::before { background-image: var(--bg-4); }
+        .frame[data-star="5"]::before { background-image: var(--bg-5); }
+
+        /* 图层 2: 立绘层 */
+        .frame .layer-portrait {
+            position: absolute;
+            z-index: 2;
+            width: 77%;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 8%;
+            top: auto;
+            height: auto;
+            object-fit: contain;
+            object-position: center bottom;
+            pointer-events: none;
+        }
+
+        /* 图层 3: 半调图案层 - 用 ::after */
+        .frame::after {
+            content: "";
+            position: absolute;
+            z-index: 3;
+            width: 100%;
+            height: 100%;
+            top: 5%;
+            left: 0;
+            background-image: var(--bandiao);
+            background-size: cover;
+            background-repeat: no-repeat;
+            opacity: 0.618;
+            pointer-events: none;
+        }
+
+        /* 图层 4: 展示层 (show_star) - 用 div + CSS 背景 */
+        .frame .layer-show {
+            position: absolute;
+            z-index: 4;
+            width: 100%;
+            height: 100%;
+            bottom: -5%;
+            left: 0;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center bottom;
+            pointer-events: none;
+        }
+        .frame[data-star="3"] .layer-show { background-image: var(--show-3); }
+        .frame[data-star="4"] .layer-show { background-image: var(--show-4); }
+        .frame[data-star="5"] .layer-show { background-image: var(--show-5); }
+
+        /* 图层 5: 武器类型图标 */
+        .frame .layer-icon {
+            position: absolute;
+            z-index: 5;
+            width: 42px;
+            height: 42px;
+            left: 10%;
+            bottom: 7%;
+            top: auto;
+            object-fit: contain;
+            opacity: 0.9;
+            pointer-events: none;
+        }
+
+        /* 无立绘时的占位 */
+        .placeholder-role {
+            position: absolute;
+            z-index: 2;
+            width: 100%;
+            height: 80%;
+            left: 0;
+            top: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 60px;
+            opacity: 0.3;
+        }
+
+        /* 卡池名称 */
+        .pool-name {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #d3bc8e;
+            font-size: 32px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            white-space: nowrap;
+            z-index: 10;
+        }
+
+        /* 特征码 (右下角) */
+        .user-code {
+            position: absolute;
+            bottom: 2px;
+            right: 15px;
+            font-size: 20px;
+            color: #ffffff;
+            font-weight: bold;
+            letter-spacing: -0.5px;
+            text-shadow:
+                -1px -1px 0 #000,
+                 1px -1px 0 #000,
+                -1px  1px 0 #000,
+                 1px  1px 0 #000;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div class="container {{ 'no-bg' if not bg_image else '' }}">
+        <!-- 卡池名称 -->
+        <div class="pool-name">{{ pool_name }}</div>
+
+        <!-- 卡片区域 -->
+        <div id="gacha" class="{{ 'single' if draw_type == 1 else '' }}">
+            {% for item in items %}
+            <div class="frame" data-star="{{ item.star }}">
+                <!-- bg_star 和 bandiao 通过 ::before / ::after 伪元素渲染，无需 img 标签 -->
+
+                <!-- 图层 2: 立绘层 -->
+                {% if item.image %}
+                <img class="layer-portrait" src="{{ item.image }}">
+                {% else %}
+                <div class="placeholder-role">
+                    {% if item.type == 'weapon' %}🗡️{% else %}👤{% endif %}
+                </div>
+                {% endif %}
+
+                <!-- 图层 4: 展示层 (show_star) - 通过 data-star + CSS 变量引用 -->
+                <div class="layer-show"></div>
+
+                <!-- 图层 5: 武器类型图标 (左下角) -->
+                {% if item.type == 'weapon' and item.weapon_type in weapon_type_icons %}
+                <img class="layer-icon" src="{{ weapon_type_icons[item.weapon_type] }}">
+                {% endif %}
+                <!-- 图层 5b: 角色元素类型图标 (左下角，同位置同大小) -->
+                {% if item.type == 'character' and item.element_type in element_type_icons %}
+                <img class="layer-icon" src="{{ element_type_icons[item.element_type] }}">
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- 特征码 (右下角) -->
+        {% if signature_code %}
+        <div class="user-code">特征码: {{ signature_code }}</div>
+        {% endif %}
+    </div>
+</body>
+</html>
