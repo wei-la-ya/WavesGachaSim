@@ -54,28 +54,9 @@
 
 ## 📦 安装方法
 
-### 方式一：通过 gsid_core 插件市场安装
-
 ```bash
 # 在 gsuid_core 插件目录执行
-git clone https://github.com/your-repo/WavesGachaSim.git
-```
-
-### 方式二：通过 pyproject.toml 安装
-
-在 `pyproject.toml` 中添加依赖：
-
-```toml
-[tool.poetry.dependencies]
-WavesGachaSim = { path = "./plugins/WavesGachaSim" }
-```
-
-### 方式三：手动安装
-
-```bash
-cd gsuid_core/plugins
-git clone https://github.com/your-repo/WavesGachaSim.git
-pip install -e WavesGachaSim
+git clone https://github.com/wei-la-ya/WavesGachaSim.git
 ```
 
 ## ⚙️ 配置说明
@@ -92,27 +73,6 @@ pip install -e WavesGachaSim
 | `GachaSimRemoteRenderUrl` | http://127.0.0.1:3000/render | 外置渲染地址 |
 | `GachaSimPoolMode` | 跟随接口 | 卡池选择模式 |
 | `GachaSimUserSwitchAll` | ✅ 开启 | 用户可切换全部卡池 |
-
-## 🔧 依赖说明
-
-### 必需依赖
-- `gsuid_core` - 核心框架
-- `XutheringWavesUID` - **资源图片、渲染工具**（必须安装！）
-- `httpx` - HTTP 请求
-- `sqlmodel` - 数据库 ORM
-
-### 可选依赖
-- `jinja2` - HTML 模板渲染（必需用于图片生成）
-- `playwright` - 本地渲染（需要 `playwright install chromium`）
-- `Pillow` - 图片处理
-
-### 资源依赖
-本插件依赖 **XutheringWavesUID** 插件提供：
-- 🎭 角色立绘图片
-- ⚔️ 武器图片
-- 🖼️ 渲染工具函数
-
-**请确保已安装 XutheringWavesUID 插件！**
 
 ## 📂 项目结构
 
