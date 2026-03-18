@@ -37,45 +37,14 @@
 | `ww模拟绑定` | 绑定/查看特征码 |
 | `ww抽卡帮助` | 查看帮助信息 |
 
-## 🎰 抽卡概率
-
-### ⭐ 5 星概率
-| 抽数范围 | 概率 |
-|----------|------|
-| 1-65 抽 | 0.8% |
-| 66-70 抽 | 4.8% → 20.8% (每抽 +4%) |
-| 71-75 抽 | 28.8% → 60.8% (每抽 +8%) |
-| 76-78 抽 | 70.8% → 90.8% (每抽 +10%) |
-| **79 抽及以上** | **100% 必出！** |
-
-### ⭐⭐ 4 星概率
-- 基础概率：6%（含 4 星武器）
-- **10 抽必出 4 星**
 
 ## 📦 安装方法
 
-### 方式一：通过 gsid_core 插件市场安装
+### 方式一：Git安装
 
 ```bash
 # 在 gsuid_core 插件目录执行
 git clone https://github.com/your-repo/WavesGachaSim.git
-```
-
-### 方式二：通过 pyproject.toml 安装
-
-在 `pyproject.toml` 中添加依赖：
-
-```toml
-[tool.poetry.dependencies]
-WavesGachaSim = { path = "./plugins/WavesGachaSim" }
-```
-
-### 方式三：手动安装
-
-```bash
-cd gsuid_core/plugins
-git clone https://github.com/your-repo/WavesGachaSim.git
-pip install -e WavesGachaSim
 ```
 
 ## ⚙️ 配置说明
@@ -93,18 +62,7 @@ pip install -e WavesGachaSim
 | `GachaSimPoolMode` | 跟随接口 | 卡池选择模式 |
 | `GachaSimUserSwitchAll` | ✅ 开启 | 用户可切换全部卡池 |
 
-## 🔧 依赖说明
 
-### 必需依赖
-- `gsuid_core` - 核心框架
-- `XutheringWavesUID` - **资源图片、渲染工具**（必须安装！）
-- `httpx` - HTTP 请求
-- `sqlmodel` - 数据库 ORM
-
-### 可选依赖
-- `jinja2` - HTML 模板渲染（必需用于图片生成）
-- `playwright` - 本地渲染（需要 `playwright install chromium`）
-- `Pillow` - 图片处理
 
 ### 资源依赖
 本插件依赖 **XutheringWavesUID** 插件提供：
@@ -152,8 +110,7 @@ WavesGachaSim/
 ## 🤝 致谢
 
 - [gsuid_core](https://github.com/gsuid_core/gsuid_core) - 核心框架
-- [XutheringWavesUID](https://github.com/xutheringwavesuid) - 资源图片与渲染工具
-- [鸣潮社区](https://wh.loping151.site) - 卡池数据 API
+- [XutheringWavesUID]([https://github.com/xutheringwavesuid](https://github.com/Loping151/XutheringWavesUID)) - 资源图片与渲染工具
 
 ## 📄 License
 
