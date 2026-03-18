@@ -90,8 +90,8 @@ WavesGachaSim/
 ## 🤝 致谢
 
 - [gsuid_core](https://github.com/gsuid_core/gsuid_core) - 核心框架
-- [XutheringWavesUID](https://github.com/Loping151/XutheringWavesUID) - 资源图片与渲染工具
-- [鸣潮社区](https://wh.loping151.site) - 卡池数据 API
+- [XutheringWavesUID](https://github.com/Loping151/XutheringWavesUID) - 资源图片与卡池数据来源
+- [AstrBot鸣潮模拟抽卡插件](https://github.com/Ruafafa/astrbot_plugin_ww_gacha_sim) - 部分样式与资源参考使用来源
 - **Claude**
 - **Gemini**
 - **ChatGPT**
