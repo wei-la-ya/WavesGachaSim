@@ -18,7 +18,7 @@ from .pool_manager import pool_manager
 from .data_manager import data_manager
 from .draw_gacha_result import render_gacha_result, format_text_result, render_pool_select
 
-sv_gacha = SV("模拟抽卡", priority=1)
+sv_gacha = SV("模拟抽卡V2", priority=1)
 
 # 每用户锁，防止同一用户并发抽卡导致保底数据竞态
 # 使用 LRU 策略：锁释放后如果没有其他等待者就删除，避免内存泄漏
