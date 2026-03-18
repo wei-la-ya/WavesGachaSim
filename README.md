@@ -37,21 +37,6 @@
 | `ww模拟绑定` | 绑定/查看特征码 |
 | `ww抽卡帮助` | 查看帮助信息 |
 
-## 🎰 抽卡概率
-
-### ⭐ 5 星概率
-| 抽数范围 | 概率 |
-|----------|------|
-| 1-65 抽 | 0.8% |
-| 66-70 抽 | 4.8% → 20.8% (每抽 +4%) |
-| 71-75 抽 | 28.8% → 60.8% (每抽 +8%) |
-| 76-78 抽 | 70.8% → 90.8% (每抽 +10%) |
-| **79 抽及以上** | **100% 必出！** |
-
-### ⭐⭐ 4 星概率
-- 基础概率：6%（含 4 星武器）
-- **10 抽必出 4 星**
-
 ## 📦 安装方法
 
 ```bash
@@ -101,26 +86,19 @@ WavesGachaSim/
     └── texture2d/             # 图片素材
 ```
 
-## 🖼️ 截图占位
-
-> 这里可以放置插件运行时的截图
-
-![抽卡结果示例](screenshot/gacha_result.png)
-
-![卡池选择示例](screenshot/pool_select.png)
 
 ## 🤝 致谢
 
 - [gsuid_core](https://github.com/gsuid_core/gsuid_core) - 核心框架
 - [XutheringWavesUID](https://github.com/Loping151/XutheringWavesUID) - 资源图片与渲染工具
 - [鸣潮社区](https://wh.loping151.site) - 卡池数据 API
-- **Claude** - 代码优化建议
-- **Gemini** - 创意与技术方案咨询
-- **ChatGPT** - 文档撰写辅助
-- **Minimax** - AI 能力支持
-- **豆包** - 日常开发协助
-- **DeepSeek** - 技术问题解答
-- **Kimi** - 代码与文案支持
+- **Claude**
+- **Gemini**
+- **ChatGPT**
+- **Minimax**
+- **豆包**
+- **DeepSeek**
+- **Kimi**
 
 ## 📄 License
 
