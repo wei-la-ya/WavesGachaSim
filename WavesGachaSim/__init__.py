@@ -7,7 +7,7 @@ Plugins(name="WavesGachaSim", force_prefix=["ww"], allow_empty_prefix=False)
 
 import asyncio
 
-from gsuid_core.sv import SV
+from gsuid_core.sv import SV, get_plugin_available_prefix
 from gsuid_core.bot import Bot
 from gsuid_core.models import Event
 from gsuid_core.segment import MessageSegment
@@ -268,6 +268,7 @@ async def _do_draw(
                 char_pools=char_pools_show,
                 weapon_pools=weapon_pools_show,
                 start_index=1,
+                prefix=get_plugin_available_prefix("WavesGachaSim"),
             )
 
             if img:
@@ -445,7 +446,7 @@ async def draw_standard_weapon_10(bot: Bot, ev: Event):
 
 # ==================== 切换卡池 ====================
 
-@sv_gacha.on_fullmatch(("切换卡池",), block=True)
+@sv_gacha.on_command(("切换卡池",), block=True)
 async def switch_pool(bot: Bot, ev: Event):
     """切换角色卡池 - 无参数展示列表，有参数执行选择"""
     uid = ev.user_id
@@ -473,6 +474,7 @@ async def switch_pool(bot: Bot, ev: Event):
             selected_char_id=current_char or "",
             selected_weapon_id="",
             start_index=1,
+            prefix=get_plugin_available_prefix("WavesGachaSim"),
         )
         if img:
             await bot.send(MessageSegment.image(img))
@@ -538,6 +540,7 @@ async def switch_pool(bot: Bot, ev: Event):
             selected_char_id=current_char or "",
             selected_weapon_id="",
             start_index=1,
+            prefix=get_plugin_available_prefix("WavesGachaSim"),
         )
         if img:
             await bot.send(MessageSegment.image(img))
@@ -576,7 +579,7 @@ async def switch_pool(bot: Bot, ev: Event):
         await bot.send(msg, at_sender)
 
 
-@sv_gacha.on_fullmatch(("切换武器卡池",), block=True)
+@sv_gacha.on_command(("切换武器卡池",), block=True)
 async def switch_weapon_pool(bot: Bot, ev: Event):
     """切换武器卡池 - 无参数展示列表，有参数执行选择"""
     uid = ev.user_id
@@ -604,6 +607,7 @@ async def switch_weapon_pool(bot: Bot, ev: Event):
             selected_char_id="",
             selected_weapon_id=current_weapon or "",
             start_index=1,
+            prefix=get_plugin_available_prefix("WavesGachaSim"),
         )
         if img:
             await bot.send(MessageSegment.image(img))

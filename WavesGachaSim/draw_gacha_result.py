@@ -516,6 +516,7 @@ async def render_pool_select(
     selected_char_id: str = "",
     selected_weapon_id: str = "",
     start_index: int = 1,
+    prefix: str = "ww",
 ) -> Optional[bytes]:
     """
     渲染卡池选择界面图片
@@ -526,6 +527,7 @@ async def render_pool_select(
         selected_char_id: 当前选中的角色卡池ID
         selected_weapon_id: 当前选中的武器卡池ID
         start_index: 起始编号
+        prefix: 命令前缀
 
     Returns:
         图片 bytes, 或 None (渲染失败)
@@ -597,6 +599,7 @@ async def render_pool_select(
         "weapon_pools": weapon_pool_data,
         "selected_char_id": selected_char_id,
         "selected_weapon_id": selected_weapon_id,
+        "prefix": prefix,
     }
 
     # 远程渲染配置

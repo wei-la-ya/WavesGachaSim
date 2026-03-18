@@ -167,7 +167,7 @@
 <body>
     <div class="container">
         <div class="title">卡池选择</div>
-        <div class="subtitle">发送 ww切换卡池+编号 进行选择</div>
+        <div class="subtitle">发送 {{ prefix }}切换卡池+编号 进行选择</div>
 
         {% if char_pools %}
         <div class="category-title">限定角色池</div>
@@ -187,6 +187,9 @@
                 </div>
             </div>
             {% endfor %}
+        </div>
+        <div class="footer-tip">
+            发送 <span class="cmd">{{ prefix }}切换卡池+编号</span> 选择角色卡池 · 选择后直到过期前一直有效
         </div>
         {% endif %}
 
@@ -209,11 +212,10 @@
             </div>
             {% endfor %}
         </div>
-        {% endif %}
-
         <div class="footer-tip">
-            发送 <span class="cmd">ww切换卡池+编号</span> 选择卡池 · 选择后直到过期前一直有效
+            发送 <span class="cmd">{{ prefix }}切换武器卡池+编号</span> 选择武器卡池 · 选择后直到过期前一直有效
         </div>
+        {% endif %}
     </div>
 </body>
 </html>
