@@ -189,6 +189,23 @@
                  1px  1px 0 #000;
             z-index: 10;
         }
+
+        /* 昵称 (特征码上方) */
+        .user-nickname {
+            position: absolute;
+            bottom: 26px;
+            right: 15px;
+            font-size: 20px;
+            color: #ffffff;
+            font-weight: bold;
+            letter-spacing: -0.5px;
+            text-shadow:
+                -1px -1px 0 #000,
+                 1px -1px 0 #000,
+                -1px  1px 0 #000,
+                 1px  1px 0 #000;
+            z-index: 10;
+        }
     </style>
 </head>
 <body>
@@ -226,8 +243,11 @@
             {% endfor %}
         </div>
 
-        <!-- 特征码 (右下角) -->
+        <!-- 昵称和特征码 (右下角) -->
         {% if signature_code %}
+        {% if nickname %}
+        <div class="user-nickname">{{ nickname }}</div>
+        {% endif %}
         <div class="user-code">特征码: {{ signature_code }}</div>
         {% endif %}
     </div>

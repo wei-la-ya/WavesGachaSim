@@ -35,24 +35,27 @@ except ImportError as e:
 
 # 检查本地渲染依赖
 try:
+    from jinja2 import Environment as _check_jinja  # noqa: F401
+    _JINJA2_AVAILABLE = True
+except ImportError:
+    _JINJA2_AVAILABLE = False
+    logger.warning("[模拟抽卡] 未安装 jinja2，HTML模板渲染不可用。")
+    logger.info("[模拟抽卡] 安装方法 Linux/Mac: 在当前目录下执行 source .venv/bin/activate && uv pip install jinja2")
+    logger.info("[模拟抽卡] 安装方法 Windows: 在当前目录下执行 .venv\\Scripts\\activate; uv pip install jinja2")
+
+try:
     from playwright.async_api import async_playwright as _check_pw  # noqa: F401
     _PLAYWRIGHT_AVAILABLE = True
 except ImportError:
     _PLAYWRIGHT_AVAILABLE = False
 
-try:
-    from jinja2 import Environment as _check_jinja  # noqa: F401
-    _JINJA2_AVAILABLE = True
-except ImportError:
-    _JINJA2_AVAILABLE = False
-
 # 启动时输出依赖状态
-if not _JINJA2_AVAILABLE:
-    logger.warning("[模拟抽卡] 未安装 jinja2，HTML模板渲染不可用。安装: pip install jinja2")
-if not _PLAYWRIGHT_AVAILABLE and render_html is not None:
-    logger.warning("[模拟抽卡] 未安装 playwright，本地HTML截图渲染不可用。可配置外置渲染或安装: pip install playwright && playwright install chromium")
 if render_html is None:
-    logger.warning("[模拟抽卡] XutheringWavesUID 渲染模块不可用，本地渲染将不可用。请确保安装了 XutheringWavesUID 插件，或开启外置渲染")
+    logger.warning("[模拟抽卡] XutheringWavesUID 渲染模块不可用，本地渲染将不可用。请确保安装了 XutheringWavesUID 插件，或开启外置渲染。")
+if not _PLAYWRIGHT_AVAILABLE and render_html is not None:
+    logger.warning("[模拟抽卡] 未安装 playwright，本地HTML截图渲染不可用。")
+    logger.info("[模拟抽卡] 安装方法 Linux/Mac: 在当前目录下执行 source .venv/bin/activate && uv pip install playwright && uv run playwright install chromium")
+    logger.info("[模拟抽卡] 安装方法 Windows: 在当前目录下执行 .venv\\Scripts\\activate; uv pip install playwright; uv run playwright install chromium")
 
 # 资源目录
 PLUGIN_DIR = Path(__file__).parent
@@ -285,8 +288,8 @@ def _get_background() -> str:
 def _find_image(name: str, item_type: str, resource_id: str = "") -> str:
     """
     查找角色/武器图片并转为 base64 data URL。
-    - 角色: ROLE_PILE_PATH / role_pile_{char_id}.png
-    - 武器: WEAPON_PATH / weapon_{weapon_id}.png
+    - texture2d目录: 角色为 {char_id}.png，武器为 {weapon_id}.png
+    - fallback: XutheringWavesUID 的 ROLE_PILE_PATH / WEAPON_PATH
     """
     if image_to_base64 is None:
         return ""
@@ -296,6 +299,14 @@ def _find_image(name: str, item_type: str, resource_id: str = "") -> str:
     if item_type == "character":
         if not rid and char_name_to_char_id:
             rid = char_name_to_char_id(name) or ""
+        
+        # 从texture2d目录查找
+        if TEXTURE_DIR.exists() and rid:
+            fp = TEXTURE_DIR / f"{rid}.png"
+            if fp.exists():
+                return image_to_base64(fp)
+        
+        # fallback: XutheringWavesUID
         if rid and ROLE_PILE_PATH:
             fp = ROLE_PILE_PATH / f"role_pile_{rid}.png"
             if fp.exists():
@@ -309,6 +320,14 @@ def _find_image(name: str, item_type: str, resource_id: str = "") -> str:
     elif item_type == "weapon":
         if not rid and weapon_name_to_weapon_id:
             rid = weapon_name_to_weapon_id(name) or ""
+        
+        # 从texture2d目录查找
+        if TEXTURE_DIR.exists() and rid:
+            fp = TEXTURE_DIR / f"{rid}.png"
+            if fp.exists():
+                return image_to_base64(fp)
+        
+        # fallback: XutheringWavesUID
         if rid and WEAPON_PATH:
             fp = WEAPON_PATH / f"weapon_{rid}.png"
             if fp.exists():
@@ -322,6 +341,7 @@ async def render_gacha_result(
     pool_name: str,
     signature_code: str = "",
     draw_type: int = 10,
+    nickname: str = "",
 ) -> Optional[bytes]:
     """
     渲染抽卡结果为图片
@@ -331,6 +351,7 @@ async def render_gacha_result(
         pool_name: 卡池名称
         signature_code: 用户特征码
         draw_type: 抽卡类型 (1=单抽, 10=十连)
+        nickname: 用户昵称
 
     Returns:
         图片 bytes, 或 None (渲染失败)
@@ -398,6 +419,7 @@ async def render_gacha_result(
         "total_count": len(results),
         "bg_image": bg_image,
         "signature_code": signature_code,
+        "nickname": nickname,
         "weapon_type_icons": weapon_type_icons,
         "element_type_icons": element_type_icons,
         "card_frames": card_frames,
