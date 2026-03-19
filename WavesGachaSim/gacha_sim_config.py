@@ -23,6 +23,11 @@ GACHA_SIM_CONFIG_DEFAULT: Dict[str, GSC] = {
         data=300,
         max_value=9999,
     ),
+    "GachaSimEnableBailian": GsBoolConfig(
+        title="百连功能开关",
+        desc="⚠️注意：此配置会增加渲染压力，请谨慎开启！\n开启后可使用「ww抽卡百连」命令，连续抽取100次（10次十连）并合并发送",
+        data=False,
+    ),
     "GachaSimMasterUnlimited": GsBoolConfig(
         title="主人无限抽取",
         desc="开启后，主人（pm<=1）不受每日抽卡次数限制",

@@ -17,6 +17,14 @@
         "need_ck": false,
         "need_sk": false,
         "need_admin": false
+      },
+      {
+        "name": "ww抽卡百连",
+        "desc": "连续10次十连（共100抽）⚠️需开启百连功能",
+        "eg": "ww抽卡百连",
+        "need_ck": false,
+        "need_sk": false,
+        "need_admin": false
       }
     ]
   },
@@ -53,25 +61,9 @@
         "need_admin": false
       },
       {
-        "name": "ww卡池状态",
-        "desc": "查看各池保底进度",
-        "eg": "ww卡池状态",
-        "need_ck": false,
-        "need_sk": false,
-        "need_admin": false
-      },
-      {
-        "name": "ww抽卡统计",
-        "desc": "查看5星出货历史",
-        "eg": "ww抽卡统计",
-        "need_ck": false,
-        "need_sk": false,
-        "need_admin": false
-      },
-      {
-        "name": "ww抽卡概率",
-        "desc": "查看概率说明",
-        "eg": "ww抽卡概率",
+        "name": "ww模拟抽卡记录",
+        "desc": "查看模拟抽卡记录图片（xwuid风格）",
+        "eg": "ww模拟抽卡记录",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false
@@ -93,9 +85,9 @@
         "need_admin": false
       },
       {
-        "name": "ww抽卡帮助",
+        "name": "ww模拟抽卡帮助",
         "desc": "查看帮助信息",
-        "eg": "ww抽卡帮助",
+        "eg": "ww模拟抽卡帮助",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false

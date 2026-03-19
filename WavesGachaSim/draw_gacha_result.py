@@ -1,7 +1,8 @@
 """鸣潮抽卡模拟器 - 渲染抽卡结果图片"""
 import base64
+from io import BytesIO
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 from gsuid_core.data_store import get_res_path
@@ -647,3 +648,203 @@ async def render_pool_select(
     except Exception as e:
         logger.error(f"[模拟抽卡] 卡池选择渲染失败: {e}")
         return None
+
+
+# ============================================================
+# 模拟抽卡记录图片渲染（xwuid风格）
+# ============================================================
+
+async def render_gacha_log_image(
+    records: List[Dict[str, Any]],
+    signature_code: str = "",
+    pool_name: str = "全部卡池",
+) -> Optional[bytes]:
+    """
+    渲染模拟抽卡记录为图片（xwuid同款样式）
+
+    Args:
+        records: 5星历史记录列表
+        signature_code: 用户特征码
+        pool_name: 卡池名称
+
+    Returns:
+        图片 bytes, 或 None (渲染失败)
+    """
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        import math
+    except ImportError:
+        logger.warning("[模拟抽卡] PIL 不可用，无法渲染抽卡记录图片")
+        return None
+
+    # 颜色定义
+    GOLD = (255, 215, 0)
+    PURPLE = (180, 124, 252)
+    BLUE = (100, 149, 237)
+    WHITE = (255, 255, 255)
+    DARK_BG = (25, 25, 35)
+    SECTION_BG = (35, 35, 50)
+    GRAY = (157, 157, 157)
+    LIGHT_GRAY = (180, 180, 180)
+
+    # 尺寸参数
+    CARD_W = 130
+    CARD_H = 130
+    CARDS_PER_ROW = 5
+    CARD_GAP = 15
+    SECTION_H = 280  # 每个卡池区块高度
+    HEADER_H = 120
+    FOOTER_H = 60
+
+    if not records:
+        # 空记录图
+        h = 400
+        img = Image.new('RGB', (1000, h), DARK_BG)
+        draw = ImageDraw.Draw(img)
+        try:
+            font_large = ImageFont.truetype("msyh.ttc", 40)
+            font_small = ImageFont.truetype("msyh.ttc", 24)
+        except Exception:
+            font_large = ImageFont.load_default()
+            font_small = font_large
+        draw.text((500, 160), "模拟抽卡", GOLD, font_large, "mm")
+        draw.text((500, 220), "暂无抽卡记录", GRAY, font_small, "mm")
+        draw.text((500, 270), "进行模拟抽卡后将显示记录", GRAY, font_small, "mm")
+        if signature_code:
+            draw.text((500, 340), f"特征码: {signature_code}", GOLD, font_small, "mm")
+        buf = BytesIO()
+        img.save(buf, format='PNG', quality=95)
+        return buf.getvalue()
+
+    # 按卡池分组
+    pools_data: Dict[str, List] = {}
+    for r in records:
+        pt = r.get('pool_type', 'unknown')
+        if pt not in pools_data:
+            pools_data[pt] = []
+        pools_data[pt].append(r)
+
+    # 计算图片高度
+    pool_count = len(pools_data)
+    total_height = HEADER_H + pool_count * SECTION_H + FOOTER_H
+
+    img = Image.new('RGB', (1000, total_height), DARK_BG)
+    draw = ImageDraw.Draw(img)
+
+    try:
+        font_title = ImageFont.truetype("msyh.ttc", 36)
+        font_bold = ImageFont.truetype("msyh.ttc", 24)
+        font_normal = ImageFont.truetype("msyh.ttc", 20)
+        font_small = ImageFont.truetype("msyh.ttc", 16)
+    except Exception:
+        font_title = font_bold = font_normal = font_small = ImageFont.load_default()
+
+    # 顶部标题栏
+    for y in range(HEADER_H):
+        alpha = int(30 * (1 - y / HEADER_H))
+        draw.rectangle([(0, y), (1000, y + 1)],
+                      fill=(40 + alpha, 35 + alpha, 55 + alpha))
+
+    # "模拟抽卡"红色标签
+    draw.rectangle([(30, 25), (200, 65)], fill=(200, 60, 60))
+    draw.text((115, 45), "模拟抽卡", WHITE, font_title, "mm")
+
+    # 统计信息
+    total_5star = len(records)
+    total_pulls = sum(r.get('pity_count', 0) for r in records) or 0
+    avg_pity = round(total_pulls / total_5star, 1) if total_5star > 0 else 0
+    up_count = len([r for r in records if r.get('is_up', False)])
+
+    draw.text((970, 35), f"五星: {total_5star}  平均:{avg_pity}抽  UP:{up_count}",
+              LIGHT_GRAY, font_normal, "rm")
+
+    # 特征码
+    if signature_code:
+        draw.text((970, 65), f"特征码: {signature_code}", GOLD, font_normal, "rm")
+
+    # 分隔线
+    draw.line([(30, HEADER_H - 10), (970, HEADER_H - 10)], fill=(60, 60, 80), width=2)
+
+    # 卡池名称映射
+    POOL_NAMES = {
+        'limited_char': '限定角色池',
+        'limited_weapon': '限定武器池',
+        'standard_char': '常驻角色池',
+        'standard_weapon': '常驻武器池',
+    }
+
+    # 绘制每个卡池区块
+    y_offset = HEADER_H
+    for pool_type, pool_records in pools_data.items():
+        pool_display_name = POOL_NAMES.get(pool_type, pool_type)
+
+        # 区块背景
+        draw.rectangle([(30, y_offset), (970, y_offset + SECTION_H - 20)],
+                       fill=SECTION_BG)
+
+        # 卡池名称
+        draw.text((50, y_offset + 30), pool_display_name, WHITE, font_bold, "lm")
+
+        # 统计
+        pool_up = len([r for r in pool_records if r.get('is_up', False)])
+        draw.text((970, y_offset + 30), f"五星:{len(pool_records)}  UP:{pool_up}",
+                  LIGHT_GRAY, font_normal, "rm")
+
+        # 分隔线
+        draw.line([(50, y_offset + 65), (950, y_offset + 65)],
+                  fill=(60, 60, 80), width=1)
+
+        # 绘制5星卡片（最新的在前）
+        sorted_records = sorted(pool_records, key=lambda x: x.get('created_at', 0), reverse=True)
+        for idx, record in enumerate(sorted_records[:10]):  # 最多显示10个
+            cx = 50 + (idx % CARDS_PER_ROW) * (CARD_W + CARD_GAP)
+            cy = y_offset + 80 + (idx // CARDS_PER_ROW) * (CARD_H + 10)
+
+            # 卡片背景
+            star = record.get('star', 5)
+            if star == 5:
+                card_color = GOLD
+            elif star == 4:
+                card_color = PURPLE
+            else:
+                card_color = BLUE
+
+            # 简化卡片：只显示名称和抽数
+            card_bg = Image.new('RGB', (CARD_W, CARD_H - 20), (40, 40, 55))
+            card_draw = ImageDraw.Draw(card_bg)
+
+            # 星级标签
+            star_text = "★" * star
+            card_draw.text((CARD_W // 2, 15), star_text, card_color, font_small, "mm")
+
+            # 名称
+            name = record.get('name', '?')
+            if len(name) > 5:
+                name = name[:5] + '…'
+            card_draw.text((CARD_W // 2, 45), name, WHITE, font_small, "mm")
+
+            # 抽数
+            pity = record.get('pity_count', 0)
+            if pity:
+                pity_color = (255, 80, 80) if pity >= 70 else (100, 200, 100) if pity <= 40 else WHITE
+                card_draw.text((CARD_W // 2, 75), f"{pity}抽", pity_color, font_small, "mm")
+
+            # UP标签
+            if record.get('is_up', False):
+                draw.rectangle([(cx + CARD_W - 30, cy), (cx + CARD_W, cy + 20)],
+                              fill=(255, 60, 60))
+                draw.text((cx + CARD_W - 15, cy + 10), "UP", WHITE, ImageFont.load_default(), "mm")
+
+            img.paste(card_bg, (cx, cy))
+
+        y_offset += SECTION_H
+
+    # 底部提示
+    if len(records) > 10 * len(pools_data):
+        draw.text((500, total_height - 35),
+                  f"... 还有 {len(records) - 10 * len(pools_data)} 条记录未显示",
+                  GRAY, font_small, "mm")
+
+    buf = BytesIO()
+    img.save(buf, format='PNG', quality=95)
+    return buf.getvalue()
