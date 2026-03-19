@@ -25,8 +25,13 @@ GACHA_SIM_CONFIG_DEFAULT: Dict[str, GSC] = {
     ),
     "GachaSimEnableBailian": GsBoolConfig(
         title="百连功能开关",
-        desc="⚠️注意：此配置会增加渲染压力，请谨慎开启！\n开启后可使用「ww抽卡百连」命令，连续抽取100次（10次十连）并合并发送",
+        desc="⚠️注意：此配置会增加渲染压力，请谨慎开启！\n开启后可使用「ww抽卡百连」命令，连续抽取100次（10次十连）并发送",
         data=False,
+    ),
+    "GachaSimBailianMerge": GsBoolConfig(
+        title="百连合并转发",
+        desc="百连结果使用合并转发发送（关闭则将图片拼合成一条消息后发送）",
+        data=True,
     ),
     "GachaSimMasterUnlimited": GsBoolConfig(
         title="主人无限抽取",

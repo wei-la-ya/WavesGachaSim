@@ -848,3 +848,4 @@ async def render_gacha_log_image(
     buf = BytesIO()
     img.save(buf, format='PNG', quality=95)
     return buf.getvalue()
+

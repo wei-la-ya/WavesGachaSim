@@ -156,23 +156,28 @@ async def _get_available_pools(pool_type: str) -> list:
 async def _update_pool_options():
     """
     动态更新手动卡池配置的 options 列表。
-    从当期卡池中提取所有UP角色名，填入配置选项供 web 管理后台下拉选择。
+    从所有卡池中提取所有限定五星角色名，填入配置选项供 web 管理后台下拉选择。
     """
     try:
-        await pool_manager.fetch_current_pools()
-        char_pools = await pool_manager.get_limited_char_pools()
+        all_pools = await pool_manager.fetch_current_pools()
         up_names = [""]  # 空选项 = 不启用
-        for pool in char_pools:
+        for pool in all_pools:
+            if pool.get("type") != "limited_char":
+                continue
             for item in pool.get("up", {}).get("5star", []):
                 name = item.get("name", "")
                 if name and name not in up_names:
                     up_names.append(name)
 
-        # 更新配置项的 options
+        # 更新配置项的 options（运行时 + 持久化到 json）
         for key in ("GachaSimManualPool1", "GachaSimManualPool2", "GachaSimManualPool3"):
             cfg = GachaSimConfig.get_config(key)
             if hasattr(cfg, "options"):
                 cfg.options = up_names
+                GachaSimConfig.config_list[key].options = up_names
+
+        # 写回 json（下次 update_config 时不会被 Python 默认值覆盖）
+        GachaSimConfig.write_config()
     except Exception:
         pass
 
@@ -747,13 +752,18 @@ async def draw_bailian(bot: Bot, ev: Event):
             await bot.send("百连抽卡失败，未生成任何图片", at_sender)
             return
 
-        # 发送结果
+        # 根据配置决定发送方式
+        use_merge = GachaSimConfig.get_config("GachaSimBailianMerge").data
         if len(images) == 1:
             await bot.send(MessageSegment.image(images[0]))
-        else:
-            # 合并转发发送
-            forward_msg = MessageSegment.node(images)
+        elif use_merge:
+            # 合并转发
+            node_list = [MessageSegment.image(img) for img in images]
+            forward_msg = MessageSegment.node(node_list)
             await bot.send(forward_msg)
+        else:
+            # 一条消息内发多张图片
+            await bot.send([MessageSegment.image(img) for img in images])
 
 
 # ==================== 模拟抽卡记录 ====================
