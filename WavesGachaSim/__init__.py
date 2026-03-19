@@ -217,9 +217,9 @@ async def _do_draw(
         # 检查每日限制
         daily_count = await data_manager.get_daily_count(uid, pool_type)
 
-        # 检查主人是否无限抽取
+        # 检查主人是否无限抽取（pm=0 为主人）
         master_unlimited = GachaSimConfig.get_config("GachaSimMasterUnlimited").data
-        if master_unlimited and ev.user_pm is not None and ev.user_pm <= 1:
+        if master_unlimited and ev.user_pm is not None and ev.user_pm == 0:
             pass
         elif daily_limit > 0 and daily_count >= daily_limit:
             at_sender = True if ev.group_id else False
@@ -657,7 +657,7 @@ async def draw_bailian(bot: Bot, ev: Event):
         daily_count = await data_manager.get_daily_count(uid, "limited_char")
 
         master_unlimited = GachaSimConfig.get_config("GachaSimMasterUnlimited").data
-        if master_unlimited and ev.user_pm is not None and ev.user_pm <= 1:
+        if master_unlimited and ev.user_pm is not None and ev.user_pm == 0:
             pass
         elif daily_limit > 0 and daily_count + BAILIAN_COUNT > daily_limit:
             at_sender = True if ev.group_id else False
