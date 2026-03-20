@@ -705,8 +705,8 @@ async def draw_bailian(bot: Bot, ev: Event):
         at_sender = True if ev.group_id else False
         await bot.send(f"🎰 开始百连抽卡（共{BAILIAN_COUNT}次十连），请稍候...", at_sender)
 
-        # 执行10次十连抽卡，收集图片
-        images: list = []
+        # 执行10次十连抽卡
+        all_results = []
         for i in range(BAILIAN_COUNT):
             try:
                 results = gacha_service.perform_draw(
@@ -715,19 +715,23 @@ async def draw_bailian(bot: Bot, ev: Event):
                     pool_manager.get_3star_weapons(),
                     count=SINGLE_COUNT,
                 )
-
                 # 记录5星
                 for item in results:
                     if item.get("star") == 5:
                         item["pool_type"] = "limited_char"
                         await data_manager.add_five_star_record(uid, ev.bot_id, item)
+                all_results.append((i, results))
+            except Exception as e:
+                logger.error(f"[模拟抽卡] 百连第{i + 1}次抽卡失败: {e}")
 
-                # 获取特征码
-                signature_code = await data_manager.get_signature(uid)
-                if not signature_code:
-                    signature_code = await data_manager.generate_signature(uid)
+        # 获取特征码（百连共享同一个特征码）
+        signature_code = await data_manager.get_signature(uid)
+        if not signature_code:
+            signature_code = await data_manager.generate_signature(uid)
 
-                # 渲染单次十连图片
+        # 并发渲染所有图片
+        async def render_one(idx: int, results: list) -> tuple:
+            try:
                 img_bytes = await render_gacha_result(
                     results,
                     pool.get("name", "未知卡池"),
@@ -736,12 +740,26 @@ async def draw_bailian(bot: Bot, ev: Event):
                     nickname=ev.sender.get('nickname', '') if ev.sender else '',
                     avatar=ev.sender.get('avatar', '') if ev.sender else '',
                 )
-
-                if img_bytes:
-                    images.append(img_bytes)
-
+                return (idx, img_bytes)
             except Exception as e:
-                logger.error(f"[模拟抽卡] 百连第{i + 1}次失败: {e}")
+                logger.error(f"[模拟抽卡] 百连第{idx + 1}次渲染失败: {e}")
+                return (idx, None)
+
+        # 创建所有渲染任务并并发执行
+        render_tasks = [render_one(i, r) for i, r in all_results]
+        render_results = await asyncio.gather(*render_tasks, return_exceptions=True)
+
+        # 收集成功的图片
+        images = []
+        for result in render_results:
+            if isinstance(result, Exception):
+                continue
+            idx, img_bytes = result
+            if img_bytes:
+                images.append((idx, img_bytes))
+
+        # 按原始顺序排序
+        images.sort(key=lambda x: x[0])
 
         # 保存保底数据和每日计数
         await data_manager.save_pity_data(uid, "limited_char", pity_data)
@@ -755,15 +773,15 @@ async def draw_bailian(bot: Bot, ev: Event):
         # 根据配置决定发送方式
         use_merge = GachaSimConfig.get_config("GachaSimBailianMerge").data
         if len(images) == 1:
-            await bot.send(MessageSegment.image(images[0]))
+            await bot.send(MessageSegment.image(images[0][1]))
         elif use_merge:
             # 合并转发
-            node_list = [MessageSegment.image(img) for img in images]
+            node_list = [MessageSegment.image(img) for _, img in images]
             forward_msg = MessageSegment.node(node_list)
             await bot.send(forward_msg)
         else:
             # 一条消息内发多张图片
-            await bot.send([MessageSegment.image(img) for img in images])
+            await bot.send([MessageSegment.image(img) for _, img in images])
 
 
 # ==================== 模拟抽卡记录 ====================

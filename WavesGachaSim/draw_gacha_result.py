@@ -548,7 +548,8 @@ async def render_pool_select(
         return None
 
     # 构造模板数据
-    idx = start_index
+    char_idx = start_index
+    weapon_idx = 1
     char_pool_data = []
     for p in char_pools:
         up5_names = "、".join([item["name"] for item in p.get("up", {}).get("5star", [])])
@@ -564,14 +565,15 @@ async def render_pool_select(
             time_range = ""
 
         char_pool_data.append({
-            "index": idx,
+            "index": char_idx,
             "id": p.get("id", ""),
             "name": p.get("name", "未知"),
             "pic": p.get("pic", ""),
             "up5_names": up5_names,
             "time_range": time_range,
+            "pool_type": "char",
         })
-        idx += 1
+        char_idx += 1
 
     weapon_pool_data = []
     for p in weapon_pools:
@@ -586,14 +588,15 @@ async def render_pool_select(
             time_range = ""
 
         weapon_pool_data.append({
-            "index": idx,
+            "index": weapon_idx,
             "id": p.get("id", ""),
             "name": p.get("name", "未知"),
             "pic": p.get("pic", ""),
             "up5_names": up5_names,
             "time_range": time_range,
+            "pool_type": "weapon",
         })
-        idx += 1
+        weapon_idx += 1
 
     context = {
         "char_pools": char_pool_data,
