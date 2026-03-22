@@ -190,7 +190,7 @@
             {% endfor %}
         </div>
         <div class="footer-tip">
-            发送 <span class="cmd">{{ prefix }}切换卡池+编号</span> 选择角色卡池（当前显示 1-{{ char_pools|length }}）· 选择后直到过期前一直有效
+            发送 <span class="cmd">{{ prefix }}切换卡池+编号</span> 选择角色卡池（当前可选 1-{{ char_pools|length }}）· 选择后直到过期前一直有效
         </div>
         {% endif %}
 
@@ -214,7 +214,7 @@
             {% endfor %}
         </div>
         <div class="footer-tip">
-            发送 <span class="cmd">{{ prefix }}切换武器卡池+编号</span> 选择武器卡池（当前显示 1-{{ weapon_pools|length }}）· 选择后直到过期前一直有效
+            发送 <span class="cmd">{{ prefix }}切换武器卡池+编号</span> 选择武器卡池（当可选 1-{{ weapon_pools|length }}）· 选择后直到过期前一直有效
         </div>
         {% endif %}
     </div>
