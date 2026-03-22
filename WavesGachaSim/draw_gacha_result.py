@@ -2,7 +2,7 @@
 import base64
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import httpx
 from gsuid_core.data_store import get_res_path
@@ -76,10 +76,20 @@ except Exception:
     gacha_sim_templates = None
 
 
-def _file_to_data_url(fp: Path, mime: str = "image/png") -> str:
-    """文件转 data URL"""
+def _file_to_data_url(fp: Path, mime: str = None) -> str:
+    """文件转 data URL，自动从扩展名检测 MIME 类型"""
     if not fp.exists():
         return ""
+    if mime is None:
+        ext = fp.suffix.lower()
+        if ext == ".webp":
+            mime = "image/webp"
+        elif ext == ".jpg" or ext == ".jpeg":
+            mime = "image/jpeg"
+        elif ext == ".gif":
+            mime = "image/gif"
+        else:
+            mime = "image/png"
     data = fp.read_bytes()
     b64 = base64.b64encode(data).decode()
     return f"data:{mime};base64,{b64}"
@@ -93,11 +103,11 @@ _weapon_type_icon_cache: Dict[int, str] = {}
 
 # 武器类型图标文件名映射
 _WEAPON_TYPE_ICON_FILES = {
-    1: "1_broadblade.png",  # 长刃
-    2: "2_sword.png",       # 迅刀
-    3: "3_pistols.png",     # 佩枪
-    4: "4_gauntlets.png",   # 臂铠
-    5: "5_rectifier.png",   # 音感仪
+    1: "1_broadblade",  # 长刃
+    2: "2_sword",       # 迅刀
+    3: "3_pistols",     # 佩枪
+    4: "4_gauntlets",   # 臂铠
+    5: "5_rectifier",   # 音感仪
 }
 
 # attributeId 到元素名称的映射
@@ -120,12 +130,12 @@ def _get_weapon_type_icons() -> Dict[int, str]:
     if _weapon_type_icon_cache:
         return _weapon_type_icon_cache
 
-    for type_id, filename in _WEAPON_TYPE_ICON_FILES.items():
-        icon_path = WEAPON_TYPE_ICON_DIR / filename
+    for type_id, basename in _WEAPON_TYPE_ICON_FILES.items():
+        icon_path = WEAPON_TYPE_ICON_DIR / f"{basename}.webp"
+        if not icon_path.exists():
+            icon_path = WEAPON_TYPE_ICON_DIR / f"{basename}.png"
         if icon_path.exists():
-            _weapon_type_icon_cache[type_id] = _file_to_data_url(
-                icon_path, "image/png"
-            )
+            _weapon_type_icon_cache[type_id] = _file_to_data_url(icon_path)
 
     logger.debug(f"[模拟抽卡] 已加载 {len(_weapon_type_icon_cache)} 个武器类型图标")
     return _weapon_type_icon_cache
@@ -142,9 +152,11 @@ def _get_element_type_icons() -> Dict[int, str]:
         return _element_type_icon_cache
 
     for attr_id, element_name in _ATTRIBUTE_ID_TO_ELEMENT.items():
-        icon_path = ELEMENT_TYPE_ICON_DIR / f"attr_simple_{element_name}.png"
+        icon_path = ELEMENT_TYPE_ICON_DIR / f"attr_simple_{element_name}.webp"
+        if not icon_path.exists():
+            icon_path = ELEMENT_TYPE_ICON_DIR / f"attr_simple_{element_name}.png"
         if icon_path.exists():
-            _element_type_icon_cache[attr_id] = _file_to_data_url(icon_path, "image/png")
+            _element_type_icon_cache[attr_id] = _file_to_data_url(icon_path)
 
     logger.debug(f"[模拟抽卡] 已加载 {len(_element_type_icon_cache)} 个元素类型图标")
     return _element_type_icon_cache
@@ -256,21 +268,26 @@ def _get_card_frame_images() -> Dict[str, str]:
         return _card_frame_cache
 
     frame_files = {
-        "bg_3": "bg_star_3star.png",
-        "bg_4": "bg_star_4star.png",
-        "bg_5": "bg_star_5star.png",
-        "show_3": "show_star_3star.png",
-        "show_4": "show_star_4star.png",
-        "show_5": "show_star_5star.png",
+        "bg_3": "bg_star_3star",
+        "bg_4": "bg_star_4star",
+        "bg_5": "bg_star_5star",
+        "show_3": "show_star_3star",
+        "show_4": "show_star_4star",
+        "show_5": "show_star_5star",
     }
 
-    for key, filename in frame_files.items():
-        fp = CARD_FRAMES_DIR / filename
+    for key, basename in frame_files.items():
+        # 优先 webp，其次 png
+        fp = CARD_FRAMES_DIR / f"{basename}.webp"
+        if not fp.exists():
+            fp = CARD_FRAMES_DIR / f"{basename}.png"
         if fp.exists():
-            _card_frame_cache[key] = _file_to_data_url(fp, "image/png")
+            _card_frame_cache[key] = _file_to_data_url(fp)
 
     # 半调图案
-    bandiao_path = TEMPLATE_DIR / "assets" / "bandiao.png"
+    bandiao_path = TEMPLATE_DIR / "assets" / "bandiao.webp"
+    if not bandiao_path.exists():
+        bandiao_path = TEMPLATE_DIR / "assets" / "bandiao.png"
     if bandiao_path.exists():
         _card_frame_cache["bandiao"] = _file_to_data_url(bandiao_path, "image/png")
 
@@ -279,10 +296,9 @@ def _get_card_frame_images() -> Dict[str, str]:
 
 def _get_background() -> str:
     """获取背景图 base64"""
-    bg_file = TEXTURE_DIR / "beijing.png"
+    bg_file = TEXTURE_DIR / "beijing.webp"
     if not bg_file.exists():
-        # fallback to original
-        bg_file = TEXTURE_DIR / "background.png"
+        bg_file = TEXTURE_DIR / "beijing.png"
     return _file_to_data_url(bg_file)
 
 
@@ -301,19 +317,28 @@ def _find_image(name: str, item_type: str, resource_id: str = "") -> str:
         if not rid and char_name_to_char_id:
             rid = char_name_to_char_id(name) or ""
         
-        # 从texture2d目录查找
+        # 从texture2d目录查找（优先 webp > png）
         if TEXTURE_DIR.exists() and rid:
+            fp = TEXTURE_DIR / f"{rid}.webp"
+            if fp.exists():
+                return image_to_base64(fp)
             fp = TEXTURE_DIR / f"{rid}.png"
             if fp.exists():
                 return image_to_base64(fp)
         
         # fallback: XutheringWavesUID
         if rid and ROLE_PILE_PATH:
+            fp = ROLE_PILE_PATH / f"role_pile_{rid}.webp"
+            if fp.exists():
+                return image_to_base64(fp)
             fp = ROLE_PILE_PATH / f"role_pile_{rid}.png"
             if fp.exists():
                 return image_to_base64(fp)
         # fallback: avatar
         if rid and AVATAR_PATH:
+            fp = AVATAR_PATH / f"role_head_{rid}.webp"
+            if fp.exists():
+                return image_to_base64(fp)
             fp = AVATAR_PATH / f"role_head_{rid}.png"
             if fp.exists():
                 return image_to_base64(fp)
@@ -322,14 +347,20 @@ def _find_image(name: str, item_type: str, resource_id: str = "") -> str:
         if not rid and weapon_name_to_weapon_id:
             rid = weapon_name_to_weapon_id(name) or ""
         
-        # 从texture2d目录查找
+        # 从texture2d目录查找（优先 webp > png）
         if TEXTURE_DIR.exists() and rid:
+            fp = TEXTURE_DIR / f"{rid}.webp"
+            if fp.exists():
+                return image_to_base64(fp)
             fp = TEXTURE_DIR / f"{rid}.png"
             if fp.exists():
                 return image_to_base64(fp)
         
         # fallback: XutheringWavesUID
         if rid and WEAPON_PATH:
+            fp = WEAPON_PATH / f"weapon_{rid}.webp"
+            if fp.exists():
+                return image_to_base64(fp)
             fp = WEAPON_PATH / f"weapon_{rid}.png"
             if fp.exists():
                 return image_to_base64(fp)
@@ -435,14 +466,12 @@ async def render_gacha_result(
     # 尝试远程渲染（如果开启）
     if has_remote:
         try:
-            # 设置字体 CSS URL
             context["font_css_url"] = font_css_url
 
             # 渲染 HTML 模板为字符串
             template = gacha_sim_templates.get_template("gacha_result.html")
             html_content = template.render(**context)
 
-            # 调用远程渲染服务
             import time as _time
             _start = _time.time()
             async with httpx.AsyncClient(timeout=60.0) as client:

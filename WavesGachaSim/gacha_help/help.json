@@ -3,25 +3,25 @@
     "desc": "模拟限定卡池抽卡",
     "data": [
       {
-        "name": "ww抽卡",
+        "name": "抽卡",
         "desc": "限定角色池十连抽",
-        "eg": "ww抽卡",
+        "eg": "抽卡",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false
       },
       {
-        "name": "ww抽卡武器",
+        "name": "抽卡武器",
         "desc": "限定武器池十连抽",
-        "eg": "ww抽卡武器",
+        "eg": "抽卡武器",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false
       },
       {
-        "name": "ww抽卡百连",
+        "name": "抽卡百连",
         "desc": "连续10次十连（共100抽）⚠️需开启百连功能",
-        "eg": "ww抽卡百连",
+        "eg": "抽卡百连",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false
@@ -32,17 +32,17 @@
     "desc": "模拟常驻卡池抽卡",
     "data": [
       {
-        "name": "ww抽卡常驻",
+        "name": "抽卡常驻",
         "desc": "常驻角色池十连抽",
-        "eg": "ww抽卡常驻",
+        "eg": "抽卡常驻",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false
       },
       {
-        "name": "ww抽卡常驻武器",
+        "name": "抽卡常驻武器",
         "desc": "常驻武器池十连抽",
-        "eg": "ww抽卡常驻武器",
+        "eg": "抽卡常驻武器",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false
@@ -53,41 +53,41 @@
     "desc": "管理和查看卡池状态",
     "data": [
       {
-        "name": "ww切换卡池",
+        "name": "切换卡池",
         "desc": "切换限定池（编号或名称）",
-        "eg": "ww切换卡池 1",
+        "eg": "切换卡池 1",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false
       },
       {
-        "name": "ww模拟抽卡记录",
+        "name": "模拟抽卡记录",
         "desc": "查看模拟抽卡记录图片（xwuid风格）",
-        "eg": "ww模拟抽卡记录",
+        "eg": "模拟抽卡记录",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false
       },
       {
-        "name": "ww更新卡池",
+        "name": "更新卡池",
         "desc": "强制从API刷新卡池数据",
-        "eg": "ww更新卡池",
+        "eg": "更新卡池",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false
       },
       {
-        "name": "ww模拟绑定",
+        "name": "模拟绑定",
         "desc": "绑定或查看特征码",
-        "eg": "ww模拟绑定 123456789",
+        "eg": "模拟绑定 123456789",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false
       },
       {
-        "name": "ww模拟抽卡帮助",
+        "name": "模拟抽卡帮助",
         "desc": "查看帮助信息",
-        "eg": "ww模拟抽卡帮助",
+        "eg": "模拟抽卡帮助",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false

@@ -431,33 +431,37 @@ async def draw_standard_weapon_10(bot: Bot, ev: Event):
 
 @sv_gacha.on_command(("切换卡池",), block=True)
 async def switch_pool(bot: Bot, ev: Event):
-    """切换角色卡池 - 无参数展示列表，有参数执行选择"""
+    """切换角色卡池 - 无参数展示列表（角色+武器合并），有参数执行选择"""
     uid = ev.user_id
     user_input = ev.text.strip() if ev.text else ""
+    prefix = get_plugin_available_prefix("WavesGachaSim")
 
     await pool_manager.fetch_current_pools()
 
     user_switch_all = GachaSimConfig.get_config("GachaSimUserSwitchAll").data
     if user_switch_all:
         limited_char_pools = await pool_manager.get_limited_char_pools()
+        limited_weapon_pools = await pool_manager.get_limited_weapon_pools()
     else:
         limited_char_pools = await _get_available_pools("limited_char")
+        limited_weapon_pools = await _get_available_pools("limited_weapon")
 
     at_sender = True if ev.group_id else False
 
     if not user_input:
-        # 无参数 → 展示列表
-        if not limited_char_pools:
-            await bot.send("当前没有可用的角色限定卡池~", at_sender)
+        # 无参数 → 展示合并列表（角色+武器）
+        if not limited_char_pools and not limited_weapon_pools:
+            await bot.send("当前没有可用的卡池~", at_sender)
             return
         current_char = await data_manager.get_selected_pool(uid, "limited_char")
+        current_weapon = await data_manager.get_selected_pool(uid, "limited_weapon")
         img = await render_pool_select(
             char_pools=limited_char_pools,
-            weapon_pools=[],
+            weapon_pools=limited_weapon_pools,
             selected_char_id=current_char or "",
-            selected_weapon_id="",
+            selected_weapon_id=current_weapon or "",
             start_index=1,
-            prefix=get_plugin_available_prefix("WavesGachaSim"),
+            prefix=prefix,
         )
         if img:
             await bot.send(MessageSegment.image(img))
@@ -465,16 +469,22 @@ async def switch_pool(bot: Bot, ev: Event):
             pool_list_text = "**可选角色卡池列表：**\n\n"
             for i, p in enumerate(limited_char_pools, 1):
                 pool_list_text += f"{i}. {p.get('name', '未知')}\n"
-            pool_list_text += "\n请回复 `ww切换卡池 + 编号` 或 `ww切换卡池 + 名称` 来选择角色卡池~"
+            pool_list_text += f"\n请回复 `{prefix}切换卡池 + 编号` 或 `{prefix}切换卡池 + 名称` 来选择角色卡池~"
             if current_char:
                 for p in limited_char_pools:
                     if p.get("id") == current_char:
                         pool_list_text += f"\n\n**当前选择：** {p.get('name')}"
                         break
+            if limited_weapon_pools:
+                pool_list_text += "\n\n**可选武器卡池：**\n"
+                char_count = len(limited_char_pools)
+                for i, p in enumerate(limited_weapon_pools, char_count + 1):
+                    pool_list_text += f"{i}. {p.get('name', '未知')}\n"
+                pool_list_text += f"\n回复 `{prefix}切换武器卡池 + 编号` 选择武器池"
             await bot.send(pool_list_text, at_sender)
         return
 
-    # 有参数 → 执行选择
+    # 有参数 → 执行选择（角色池）
     selected_pool = None
     if user_input.isdigit():
         idx = int(user_input)
@@ -486,87 +496,94 @@ async def switch_pool(bot: Bot, ev: Event):
                 selected_pool = p.get("id")
                 break
     if selected_pool:
-        await data_manager.set_selected_pool(uid, "limited_char", selected_pool)
         pool_name = ""
         for p in limited_char_pools:
             if p.get("id") == selected_pool:
                 pool_name = p.get("name")
                 break
-        msg = f"已切换到 [限定角色] {pool_name}~"
-        await bot.send(msg, at_sender)
+        await data_manager.set_selected_pool(uid, "limited_char", selected_pool)
+        await bot.send(f"已切换到 [限定角色] {pool_name}~", at_sender)
     else:
-        msg = f"未找到匹配 '{user_input}' 的角色卡池，请检查后重试~"
-        await bot.send(msg, at_sender)
+        await bot.send(f"未找到匹配 '{user_input}' 的角色卡池，请检查后重试~", at_sender)
 
 
 @sv_gacha.on_command(("切换武器卡池",), block=True)
 async def switch_weapon_pool(bot: Bot, ev: Event):
-    """切换武器卡池 - 无参数展示列表，有参数执行选择"""
+    """切换武器卡池 - 无参数展示合并列表（角色+武器），有参数执行选择"""
     uid = ev.user_id
     user_input = ev.text.strip() if ev.text else ""
+    prefix = get_plugin_available_prefix("WavesGachaSim")
 
     await pool_manager.fetch_current_pools()
 
     user_switch_all = GachaSimConfig.get_config("GachaSimUserSwitchAll").data
     if user_switch_all:
+        limited_char_pools = await pool_manager.get_limited_char_pools()
         limited_weapon_pools = await pool_manager.get_limited_weapon_pools()
     else:
+        limited_char_pools = await _get_available_pools("limited_char")
         limited_weapon_pools = await _get_available_pools("limited_weapon")
 
     at_sender = True if ev.group_id else False
 
     if not user_input:
-        # 无参数 → 展示列表
-        if not limited_weapon_pools:
-            await bot.send("当前没有可用的武器限定卡池~", at_sender)
+        # 无参数 → 展示合并列表（角色+武器）
+        if not limited_char_pools and not limited_weapon_pools:
+            await bot.send("当前没有可用的卡池~", at_sender)
             return
+        current_char = await data_manager.get_selected_pool(uid, "limited_char")
         current_weapon = await data_manager.get_selected_pool(uid, "limited_weapon")
         img = await render_pool_select(
-            char_pools=[],
+            char_pools=limited_char_pools,
             weapon_pools=limited_weapon_pools,
-            selected_char_id="",
+            selected_char_id=current_char or "",
             selected_weapon_id=current_weapon or "",
             start_index=1,
-            prefix=get_plugin_available_prefix("WavesGachaSim"),
+            prefix=prefix,
         )
         if img:
             await bot.send(MessageSegment.image(img))
         else:
             pool_list_text = "**可选武器卡池列表：**\n\n"
-            for i, p in enumerate(limited_weapon_pools, 1):
+            char_count = len(limited_char_pools)
+            for i, p in enumerate(limited_weapon_pools, char_count + 1):
                 pool_list_text += f"{i}. {p.get('name', '未知')}\n"
-            pool_list_text += "\n请回复 `ww切换武器卡池 + 编号` 或 `ww切换武器卡池 + 名称` 来选择武器卡池~"
+            pool_list_text += f"\n请回复 `{prefix}切换武器卡池 + 编号` 或 `{prefix}切换武器卡池 + 名称` 来选择武器卡池~"
             if current_weapon:
-                for p in limited_weapon_pools:
-                    if p.get("id") == current_weapon:
-                        pool_list_text += f"\n\n**当前选择：** {p.get('name')}"
-                        break
+                pool_list_text += f"\n\n**当前选择：** {current_weapon}"
+            if limited_char_pools:
+                pool_list_text += "\n\n**可选角色池：**\n"
+                for i, p in enumerate(limited_char_pools, 1):
+                    pool_list_text += f"{i}. {p.get('name', '未知')}\n"
+                pool_list_text += f"\n回复 `{prefix}切换卡池 + 编号` 选择角色池"
             await bot.send(pool_list_text, at_sender)
         return
 
-    # 有参数 → 执行选择
+    # 有参数 → 执行选择（武器池）
+    # 图片里武器池编号 = char_count + weapon_pool_index + 1
     selected_pool = None
+    char_count = len(limited_char_pools)
     if user_input.isdigit():
         idx = int(user_input)
-        if 1 <= idx <= len(limited_weapon_pools):
-            selected_pool = limited_weapon_pools[idx - 1].get("id")
+        # 用户输入的编号在图片里是 char_count + 1 起
+        weapon_idx = idx - char_count
+        if 1 <= weapon_idx <= len(limited_weapon_pools):
+            selected_pool = limited_weapon_pools[weapon_idx - 1].get("id")
     else:
         for p in limited_weapon_pools:
             if user_input in p.get("name", ""):
                 selected_pool = p.get("id")
                 break
     if selected_pool:
-        await data_manager.set_selected_pool(uid, "limited_weapon", selected_pool)
         pool_name = ""
         for p in limited_weapon_pools:
             if p.get("id") == selected_pool:
                 pool_name = p.get("name")
                 break
-        msg = f"已切换到 [限定武器] {pool_name}~"
-        await bot.send(msg, at_sender)
+        await data_manager.set_selected_pool(uid, "limited_weapon", selected_pool)
+        await bot.send(f"已切换到 [限定武器] {pool_name}~", at_sender)
     else:
-        msg = f"未找到匹配 '{user_input}' 的武器卡池，请检查后重试~"
-        await bot.send(msg, at_sender)
+        await bot.send(f"未找到匹配 '{user_input}' 的武器卡池，请检查后重试~", at_sender)
 
 
 # ==================== 更新卡池 ====================
