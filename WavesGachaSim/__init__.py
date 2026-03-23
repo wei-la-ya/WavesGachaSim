@@ -698,8 +698,17 @@ async def draw_bailian(bot: Bot, ev: Event):
                 selected_pool_id = ""
 
         if not pool and len(available_pools) > 1:
-            at_sender = True if ev.group_id else False
-            await bot.send("百连前请先使用「ww切换卡池」选择卡池", at_sender)
+            # 多卡池时未选择 → 发卡池选择图片
+            char_pools_show = [p for p in available_pools if p.get("type") == "limited_char"]
+            weapon_pools_show = await _get_available_pools("limited_weapon")
+            img = await render_pool_select(
+                char_pools=char_pools_show,
+                weapon_pools=weapon_pools_show,
+                start_index=1,
+                prefix=get_plugin_available_prefix("WavesGachaSim"),
+            )
+            if img:
+                await bot.send(MessageSegment.image(img))
             return
 
         if not pool:
