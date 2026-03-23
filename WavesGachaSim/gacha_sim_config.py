@@ -91,7 +91,7 @@ GACHA_SIM_CONFIG_DEFAULT: Dict[str, GSC] = {
     ),
     "GachaSimInjectHelp": GsBoolConfig(
         title="是否强兼xw",
-        desc="开启后在ww帮助内插入抽卡帮助（需安装XutheringWavesUID插件）",
+        desc="开启后在ww帮助内插入抽卡帮助（需安装XutheringWavesUID插件，开启与关闭需重启才可生效）",
         data=False,
     ),
 }

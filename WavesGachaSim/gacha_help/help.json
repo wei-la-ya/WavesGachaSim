@@ -69,28 +69,33 @@
         "need_admin": false
       },
       {
-        "name": "更新卡池",
-        "desc": "强制从API刷新卡池数据",
-        "eg": "更新卡池",
-        "need_ck": false,
-        "need_sk": false,
-        "need_admin": false
-      },
-      {
         "name": "模拟绑定",
         "desc": "绑定或查看特征码",
         "eg": "模拟绑定 123456789",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false
-      },
+      }
+    ]
+  },
+  "bot主人功能": {
+    "desc": "Bot主人功能",
+    "data": [
       {
         "name": "模拟抽卡帮助",
         "desc": "查看帮助信息",
         "eg": "模拟抽卡帮助",
         "need_ck": false,
         "need_sk": false,
-        "need_admin": false
+        "need_admin": true
+      },
+      {
+        "name": "更新卡池",
+        "desc": "强制从API刷新卡池数据",
+        "eg": "更新卡池",
+        "need_ck": false,
+        "need_sk": false,
+        "need_admin": true
       }
     ]
   }

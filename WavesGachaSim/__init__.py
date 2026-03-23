@@ -26,7 +26,6 @@ from .gacha_help.get_help import get_help
 
 sv_gacha = SV("模拟抽卡V2", priority=1)
 
-# ==================== 帮助命令 ====================
 @sv_gacha.on_fullmatch(("模拟抽卡帮助",), block=True)
 async def send_gacha_help(bot: Bot, ev: Event):
     """发送图片版帮助"""
@@ -375,7 +374,6 @@ async def _do_draw(
 
 
 
-# ==================== 限定角色抽卡 ====================
 @sv_gacha.on_fullmatch(("抽卡",), block=True)
 async def draw_limited_char_10(bot: Bot, ev: Event):
     """限定角色十连抽"""
@@ -388,7 +386,6 @@ async def draw_limited_char_10(bot: Bot, ev: Event):
     )
 
 
-# ==================== 限定武器抽卡 ====================
 @sv_gacha.on_fullmatch(("抽卡武器",), block=True)
 async def draw_limited_weapon_10(bot: Bot, ev: Event):
     """限定武器十连抽"""
@@ -401,7 +398,6 @@ async def draw_limited_weapon_10(bot: Bot, ev: Event):
     )
 
 
-# ==================== 常驻角色抽卡 ====================
 @sv_gacha.on_fullmatch(("抽卡常驻",), block=True)
 async def draw_standard_char_10(bot: Bot, ev: Event):
     """常驻角色十连抽"""
@@ -414,7 +410,6 @@ async def draw_standard_char_10(bot: Bot, ev: Event):
     )
 
 
-# ==================== 常驻武器抽卡 ====================
 @sv_gacha.on_fullmatch(("抽卡常驻武器",), block=True)
 async def draw_standard_weapon_10(bot: Bot, ev: Event):
     """常驻武器十连抽"""
@@ -427,7 +422,6 @@ async def draw_standard_weapon_10(bot: Bot, ev: Event):
     )
 
 
-# ==================== 切换卡池 ====================
 
 @sv_gacha.on_command(("切换卡池",), block=True)
 async def switch_pool(bot: Bot, ev: Event):
@@ -586,10 +580,11 @@ async def switch_weapon_pool(bot: Bot, ev: Event):
         await bot.send(f"未找到匹配 '{user_input}' 的武器卡池，请检查后重试~", at_sender)
 
 
-# ==================== 更新卡池 ====================
 @sv_gacha.on_command(("更新卡池",), block=True)
 async def update_pools(bot: Bot, ev: Event):
-    """强制从API获取最新卡池"""
+    if ev.user_pm > 0:
+        return
+
     at_sender = True if ev.group_id else False
     msg = "正在从API获取最新卡池数据..."
     await bot.send(msg, at_sender)
@@ -841,6 +836,7 @@ async def draw_sim_gacha_log(bot: Bot, ev: Event):
 
 
 # 强兼xw
+import sys
 import json as _json
 from pathlib import Path as _Path
 from importlib import import_module as _import_module, invalidate_caches as _invalidate_caches
@@ -853,6 +849,8 @@ def _inject_gacha_help_to_xwuid():
         from .gacha_sim_config import GachaSimConfig
         if not GachaSimConfig.get_config("GachaSimInjectHelp").data:
             return
+
+
 
         # 读取 WavesGachaSim 的 help.json
         gacha_help_json = _Path(__file__).parent / "gacha_help" / "help.json"
@@ -871,10 +869,13 @@ def _inject_gacha_help_to_xwuid():
         if not wavesgacha_help:
             return
 
-        # 动态导入 XutheringWavesUID 的 get_help 模块
-        xwuid_help = _import_module(
-            "XutheringWavesUID.XutheringWavesUID.wutheringwaves_help.get_help"
-        )
+        # 直接从 sys.modules 拿模块对象（确保是 gsuid_core 加载时的那个）
+        xwuid_help = sys.modules.get("plugins.XutheringWavesUID.XutheringWavesUID.wutheringwaves_help.get_help")
+        if xwuid_help is None:
+
+            return
+
+
 
         def wrapped_get_help_data():
             """包装 XutheringWavesUID 的 get_help_data，注入抽卡帮助"""
@@ -887,7 +888,15 @@ def _inject_gacha_help_to_xwuid():
             return result
 
         xwuid_help.get_help_data = wrapped_get_help_data
+
+        # 同时直接修改 plugin_help 字典（双重保险）
+        if "模拟抽卡" not in xwuid_help.plugin_help:
+            xwuid_help.plugin_help["模拟抽卡"] = {
+                "desc": "鸣潮模拟抽卡 — 试试你的运气吧！",
+                "data": wavesgacha_help,
+            }
         _invalidate_caches()
+
     except Exception:
         pass
 

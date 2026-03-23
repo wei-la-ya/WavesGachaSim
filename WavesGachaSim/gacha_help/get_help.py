@@ -1,8 +1,8 @@
 """鸣潮模拟抽卡 - 帮助图生成"""
 
 import json
-from typing import Dict
 from pathlib import Path
+from typing import Dict
 
 from PIL import Image
 
