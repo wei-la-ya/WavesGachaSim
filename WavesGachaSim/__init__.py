@@ -838,3 +838,65 @@ async def draw_sim_gacha_log(bot: Bot, ev: Event):
                 msg += f"★{r['star']} {r['name']}{up_tag}\n"
         at_sender = True if ev.group_id else False
         await bot.send(msg, at_sender)
+
+
+# 强兼xw
+import json as _json
+from pathlib import Path as _Path
+from importlib import import_module as _import_module, invalidate_caches as _invalidate_caches
+
+
+def _inject_gacha_help_to_xwuid():
+    """将抽卡帮助注入到 XutheringWavesUID 帮助图（取决于配置开关）"""
+    try:
+        # 检查配置开关
+        from .gacha_sim_config import GachaSimConfig
+        if not GachaSimConfig.get_config("GachaSimInjectHelp").data:
+            return
+
+        # 读取 WavesGachaSim 的 help.json
+        gacha_help_json = _Path(__file__).parent / "gacha_help" / "help.json"
+        if not gacha_help_json.exists():
+            return
+
+        with open(gacha_help_json, "r", encoding="utf-8") as f:
+            gacha_data = _json.load(f)
+
+        wavesgacha_help = (
+            gacha_data.get("卡池管理", {}).get("data", [])
+            + gacha_data.get("限定抽卡", {}).get("data", [])
+            + gacha_data.get("常驻抽卡", {}).get("data", [])
+        )
+
+        if not wavesgacha_help:
+            return
+
+        # 动态导入 XutheringWavesUID 的 get_help 模块
+        xwuid_help = _import_module(
+            "XutheringWavesUID.XutheringWavesUID.wutheringwaves_help.get_help"
+        )
+
+        def wrapped_get_help_data():
+            """包装 XutheringWavesUID 的 get_help_data，注入抽卡帮助"""
+            result = xwuid_help.get_help_data()
+            if "模拟抽卡" not in result:
+                result["模拟抽卡"] = {
+                    "desc": "鸣潮模拟抽卡 — 试试你的运气吧！",
+                    "data": wavesgacha_help,
+                }
+            return result
+
+        xwuid_help.get_help_data = wrapped_get_help_data
+        _invalidate_caches()
+    except Exception:
+        pass
+
+
+# 延迟注入，等 XutheringWavesUID 完全加载后再操作
+try:
+    import asyncio as _asyncio
+    loop = _asyncio.get_running_loop()
+    loop.call_later(3.0, _inject_gacha_help_to_xwuid)
+except RuntimeError:
+    # 没有运行中的事件循环（同步导入场景），直接尝试注入
+    _inject_gacha_help_to_xwuid()

@@ -89,6 +89,11 @@ GACHA_SIM_CONFIG_DEFAULT: Dict[str, GSC] = {
         desc="开启: 用户可自由切换所有限定池；关闭: 用户只能在配置范围内选择",
         data=True,
     ),
+    "GachaSimInjectHelp": GsBoolConfig(
+        title="是否强兼xw",
+        desc="开启后在ww帮助内插入抽卡帮助（需安装XutheringWavesUID插件）",
+        data=False,
+    ),
 }
 
 GachaSimConfig = StringConfig(

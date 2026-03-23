@@ -8,6 +8,7 @@ from PIL import Image
 
 from gsuid_core.help.model import PluginHelp
 from gsuid_core.help.draw_new_plugin_help import get_new_help
+from gsuid_core.sv import get_plugin_available_prefix
 
 ICON = Path(__file__).parent.parent.parent / "ICON.png"
 HELP_DATA = Path(__file__).parent / "help.json"
@@ -29,13 +30,16 @@ def get_help_data() -> Dict[str, PluginHelp]:
         return json.load(f)
 
 
+PREFIX = get_plugin_available_prefix("WavesGachaSim")
+
+
 async def get_help(pm: int = 6):
     """生成帮助图"""
     kwargs = dict(
         plugin_name="WavesGachaSim",
         plugin_info={"v0.1.0": ""},
         plugin_help=get_help_data(),
-        plugin_prefix="",  # help.json 中命令已含前缀
+        plugin_prefix=PREFIX,
         help_mode="dark",
         banner_sub_text="试试你的运气吧！",
         enable_cache=True,
