@@ -296,9 +296,9 @@ def _get_card_frame_images() -> Dict[str, str]:
 
 def _get_background() -> str:
     """获取背景图 base64"""
-    bg_file = TEXTURE_DIR / "background.webp"
+    bg_file = TEXTURE_DIR / "beijing.webp"
     if not bg_file.exists():
-        bg_file = TEXTURE_DIR / "background.png"
+        bg_file = TEXTURE_DIR / "beijing.png"
     return _file_to_data_url(bg_file)
 
 
