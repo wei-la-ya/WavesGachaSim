@@ -682,9 +682,9 @@ async def render_pool_select(
         return None
 
 
-# ============================================================
-# 模拟抽卡记录图片渲染（xwuid风格）
-# ============================================================
+
+# 模拟抽卡记录图片渲染（暂时留下入口，后续再写）
+
 
 async def render_gacha_log_image(
     records: List[Dict[str, Any]],
