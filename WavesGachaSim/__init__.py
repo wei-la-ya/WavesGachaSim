@@ -32,48 +32,74 @@ async def send_gacha_help(bot: Bot, ev: Event):
     await bot.send_option(await get_help(ev.user_pm), [])
 
 # 每用户锁，防止同一用户并发抽卡导致保底数据竞态
-# 使用 LRU 策略：锁释放后如果没有其他等待者就删除，避免内存泄漏
-_user_locks: dict[str, asyncio.Lock] = {}
-_user_lock_waits: dict[str, int] = {}  # 记录每个锁的等待者数量
+# BoundedSemaphore(1) 同一时刻只允许一个协程持有锁，
+# release 次数超过 acquire 时会抛 ValueError，比 Lock 更安全
+_user_locks: dict[str, asyncio.BoundedSemaphore] = {}
 
 
-def _get_user_lock(uid: str) -> asyncio.Lock:
-    """获取用户的锁，如果不存在则创建"""
+def _get_user_lock(uid: str) -> asyncio.BoundedSemaphore:
+    """获取用户的信号量，如果不存在则创建"""
     if uid not in _user_locks:
-        _user_locks[uid] = asyncio.Lock()
+        _user_locks[uid] = asyncio.BoundedSemaphore(1)
     return _user_locks[uid]
 
 
-async def _release_user_lock(uid: str) -> None:
-    """释放锁后检查是否需要清理"""
-    # 检查是否还有其他等待者
-    wait_count = _user_lock_waits.get(uid, 0)
-    if wait_count <= 0 and uid in _user_locks:
-        # 没有等待者了，删除锁释放内存
-        del _user_locks[uid]
-        if uid in _user_lock_waits:
-            del _user_lock_waits[uid]
-
-
 class _UserLockContext:
-    """用户锁上下文管理器，支持 LRU 清理"""
+    """用户锁上下文管理器"""
 
     def __init__(self, uid: str):
         self.uid = uid
-        self.lock = _get_user_lock(uid)
+        self.sem = _get_user_lock(uid)
 
     async def __aenter__(self):
-        # 增加等待计数
-        _user_lock_waits[self.uid] = _user_lock_waits.get(self.uid, 0) + 1
-        await self.lock.acquire()
-        return self.lock
+        await self.sem.acquire()
+        return self.sem
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        self.lock.release()
-        # 减少等待计数
-        _user_lock_waits[self.uid] = _user_lock_waits.get(self.uid, 1) - 1
-        # 检查是否需要清理
-        await _release_user_lock(self.uid)
+        self.sem.release()
+
+
+async def _check_daily_limit(
+    bot: Bot,
+    ev: Event,
+    pool_type: str,
+    count: int,
+) -> bool:
+    """
+    检查每日抽卡限制。
+
+    Returns:
+        True: 通过检查，可以继续抽卡
+        False: 已达上限或功能关闭，消息已发送，不可以继续
+    """
+    # 检查功能总开关
+    if not GachaSimConfig.get_config("GachaSimEnabled").data:
+        at_sender = bool(ev.group_id)
+        await bot.send("模拟抽卡功能已关闭", at_sender)
+        return False
+
+    uid = ev.user_id
+    daily_limit = GachaSimConfig.get_config("GachaSimDailyLimit").data
+    daily_count = await data_manager.get_daily_count(uid, pool_type)
+
+    # 主人（pm=0）无限抽取
+    master_unlimited = GachaSimConfig.get_config("GachaSimMasterUnlimited").data
+    if master_unlimited and ev.user_pm is not None and ev.user_pm == 0:
+        return True
+
+    if daily_limit > 0 and daily_count + count > daily_limit:
+        at_sender = bool(ev.group_id)
+        remaining = max(0, daily_limit - daily_count)
+        if pool_type == "limited_char" and count == 100:
+            msg = f"百连需要{count}次抽取机会，你今日已抽{daily_count}次，上限{daily_limit}次"
+        elif remaining <= 0:
+            msg = f"今日该池已抽{daily_count}次，已达上限{daily_limit}次"
+        else:
+            msg = f"今日该池已抽{daily_count}次，再抽{count}次将超过上限{daily_limit}次"
+        await bot.send(msg, at_sender)
+        return False
+
+    return True
 
 
 async def _get_available_pools(pool_type: str) -> list:
@@ -202,30 +228,12 @@ async def _do_draw(
     """通用的抽卡处理函数"""
     uid = ev.user_id
 
-    # 检查功能总开关
-    if not GachaSimConfig.get_config("GachaSimEnabled").data:
-        at_sender = True if ev.group_id else False
-        await bot.send("模拟抽卡功能已关闭", at_sender)
+    # 在加锁前先检查每日限制，避免不必要的锁竞争
+    if not await _check_daily_limit(bot, ev, pool_type, count):
         return
 
-    # 同一用户加锁，防止并发竞态（使用 LRU 上下文管理器）
+    # 同一用户加锁，防止并发竞态
     async with _UserLockContext(uid):
-        # 获取每日限制配置
-        daily_limit = GachaSimConfig.get_config("GachaSimDailyLimit").data
-
-        # 检查每日限制
-        daily_count = await data_manager.get_daily_count(uid, pool_type)
-
-        # 检查主人是否无限抽取（pm=0 为主人）
-        master_unlimited = GachaSimConfig.get_config("GachaSimMasterUnlimited").data
-        if master_unlimited and ev.user_pm is not None and ev.user_pm == 0:
-            pass
-        elif daily_limit > 0 and daily_count >= daily_limit:
-            at_sender = True if ev.group_id else False
-            msg = f"今日该池已抽{daily_count}次，已达上限{daily_limit}次"
-            await bot.send(msg, at_sender)
-            return
-
         # 获取卡池
         await pool_manager.fetch_current_pools()
 
@@ -649,12 +657,6 @@ async def draw_bailian(bot: Bot, ev: Event):
     """百连抽卡 - 连续10次十连"""
     uid = ev.user_id
 
-    # 检查功能总开关
-    if not GachaSimConfig.get_config("GachaSimEnabled").data:
-        at_sender = True if ev.group_id else False
-        await bot.send("模拟抽卡功能已关闭", at_sender)
-        return
-
     # 检查百连开关（关闭时静默返回）
     if not GachaSimConfig.get_config("GachaSimEnableBailian").data:
         return
@@ -662,21 +664,12 @@ async def draw_bailian(bot: Bot, ev: Event):
     BAILIAN_COUNT = 10  # 百连 = 10次十连
     SINGLE_COUNT = 10   # 每次十连
 
+    # 在加锁前检查每日限制（百连需 100 次）
+    if not await _check_daily_limit(bot, ev, "limited_char", BAILIAN_COUNT):
+        return
+
     # 同一用户加锁
     async with _UserLockContext(uid):
-        # 检查每日限制（百连需要100次）
-        daily_limit = GachaSimConfig.get_config("GachaSimDailyLimit").data
-        daily_count = await data_manager.get_daily_count(uid, "limited_char")
-
-        master_unlimited = GachaSimConfig.get_config("GachaSimMasterUnlimited").data
-        if master_unlimited and ev.user_pm is not None and ev.user_pm == 0:
-            pass
-        elif daily_limit > 0 and daily_count + BAILIAN_COUNT > daily_limit:
-            at_sender = True if ev.group_id else False
-            msg = f"百连需要{BAILIAN_COUNT}次抽取机会，你今日已抽{daily_count}次，上限{daily_limit}次"
-            await bot.send(msg, at_sender)
-            return
-
         # 获取卡池
         await pool_manager.fetch_current_pools()
         selected_pool_id = await data_manager.get_selected_pool(uid, "limited_char")
@@ -722,11 +715,10 @@ async def draw_bailian(bot: Bot, ev: Event):
         # 获取保底数据
         pity_data = await data_manager.get_pity_data(uid, "limited_char")
 
-        # 发送提示
-        at_sender = True if ev.group_id else False
+        at_sender = bool(ev.group_id)
         await bot.send(f"🎰 开始百连抽卡（共{BAILIAN_COUNT}次十连），请稍候...", at_sender)
 
-        # 执行10次十连抽卡
+        # 执行10次十连抽卡（每次独立调用，保持语义）
         all_results = []
         for i in range(BAILIAN_COUNT):
             try:
@@ -766,7 +758,6 @@ async def draw_bailian(bot: Bot, ev: Event):
                 logger.error(f"[模拟抽卡] 百连第{idx + 1}次渲染失败: {e}")
                 return (idx, None)
 
-        # 创建所有渲染任务并并发执行
         render_tasks = [render_one(i, r) for i, r in all_results]
         render_results = await asyncio.gather(*render_tasks, return_exceptions=True)
 

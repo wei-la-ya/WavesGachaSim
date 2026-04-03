@@ -3,7 +3,7 @@ import asyncio
 import json
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from gsuid_core.logger import logger
 from gsuid_core.data_store import get_res_path
@@ -43,7 +43,7 @@ class PoolManager:
         self._weapons_3star: Optional[List[str]] = None
         self._cached_limited_pools: Optional[List[Dict]] = None
         self._cache_date: str = ""
-        self._fetch_lock: asyncio.Lock = None  # 并发保护锁
+        self._fetch_lock: Union[asyncio.Lock, None] = None  # 并发保护锁
         # 启动时从本地 JSON 加载上次缓存
         self._load_pool_cache()
 

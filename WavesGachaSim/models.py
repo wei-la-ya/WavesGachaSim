@@ -8,7 +8,6 @@ from sqlmodel import Field, select
 from sqlalchemy import delete, update
 from sqlalchemy.sql import and_
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm.attributes import InstrumentedAttribute
 from sqlalchemy.sql.expression import func
 
 from gsuid_core.utils.database.base_models import BaseIDModel, with_session
@@ -18,10 +17,10 @@ from gsuid_core.webconsole.mount_app import PageSchema, GsAdminModel, site
 # ==================== GachaSimPity (保底数据表) ====================
 class GachaSimPity(BaseIDModel, table=True):
     """保底数据表"""
-    
+
     __tablename__ = "GachaSimPity"
     __table_args__ = {"extend_existing": True}
-    
+
     user_id: str = Field(title="用户ID")
     bot_id: str = Field(default="", title="平台")
     pool_type: str = Field(title="卡池类型")
@@ -30,7 +29,7 @@ class GachaSimPity(BaseIDModel, table=True):
     guaranteed5: bool = Field(default=False, title="5星大保底")
     guaranteed4: bool = Field(default=False, title="4星大保底")
     total_count: int = Field(default=0, title="总抽数")
-    
+
     @classmethod
     @with_session
     async def get_pity(
@@ -46,7 +45,7 @@ class GachaSimPity(BaseIDModel, table=True):
             )
         )
         return result.scalars().first()
-    
+
     @classmethod
     @with_session
     async def save_pity(
@@ -61,7 +60,6 @@ class GachaSimPity(BaseIDModel, table=True):
         total_count: int,
     ) -> None:
         """保存保底数据"""
-        # 尝试更新现有记录
         stmt = (
             update(cls)
             .where(and_(cls.user_id == user_id, cls.pool_type == pool_type))
@@ -74,8 +72,7 @@ class GachaSimPity(BaseIDModel, table=True):
             )
         )
         result = await session.execute(stmt)
-        
-        # 如果没有更新任何行，则插入新记录
+
         if result.rowcount == 0:
             session.add(cls(
                 user_id=user_id,
@@ -86,7 +83,7 @@ class GachaSimPity(BaseIDModel, table=True):
                 guaranteed4=guaranteed4,
                 total_count=total_count,
             ))
-    
+
     @classmethod
     @with_session
     async def reset_pity(
@@ -105,10 +102,10 @@ class GachaSimPity(BaseIDModel, table=True):
 # ==================== GachaSimRecord (出货记录表) ====================
 class GachaSimRecord(BaseIDModel, table=True):
     """5星出货记录表"""
-    
+
     __tablename__ = "GachaSimRecord"
     __table_args__ = {"extend_existing": True}
-    
+
     user_id: str = Field(title="用户ID")
     bot_id: str = Field(default="", title="平台")
     pool_type: str = Field(title="卡池类型")
@@ -118,7 +115,7 @@ class GachaSimRecord(BaseIDModel, table=True):
     is_up: bool = Field(default=False, title="是否UP")
     pity_count: int = Field(default=0, title="抽数")
     created_at: int = Field(default=0, title="时间戳")
-    
+
     @classmethod
     @with_session
     async def add_record(
@@ -145,7 +142,7 @@ class GachaSimRecord(BaseIDModel, table=True):
             pity_count=pity_count,
             created_at=int(time.time()),
         ))
-    
+
     @classmethod
     @with_session
     async def get_history(
@@ -163,7 +160,7 @@ class GachaSimRecord(BaseIDModel, table=True):
         )
         result = await session.execute(stmt)
         return list(result.scalars().all())
-    
+
     @classmethod
     @with_session
     async def get_stats(
@@ -172,38 +169,34 @@ class GachaSimRecord(BaseIDModel, table=True):
         user_id: str,
     ) -> Dict[str, Any]:
         """获取统计信息"""
-        # 总5星数
         stmt = (
             select(func.count(cls.id))
             .where(and_(cls.user_id == user_id, cls.star == 5))
         )
         result = await session.execute(stmt)
         total_5star = result.scalar() or 0
-        
-        # 总4星数
+
         stmt = (
             select(func.count(cls.id))
             .where(and_(cls.user_id == user_id, cls.star == 4))
         )
         result = await session.execute(stmt)
         total_4star = result.scalar() or 0
-        
-        # UP数
+
         stmt = (
             select(func.count(cls.id))
-            .where(and_(cls.user_id == user_id, cls.is_up == True))  # noqa: E712
+            .where(cls.user_id == user_id, cls.is_up == True)  # noqa: E712
         )
         result = await session.execute(stmt)
         total_up = result.scalar() or 0
-        
-        # 平均抽数
+
         stmt = (
             select(func.avg(cls.pity_count))
             .where(and_(cls.user_id == user_id, cls.star == 5))
         )
         result = await session.execute(stmt)
         avg_pity = result.scalar() or 0
-        
+
         return {
             "total_5star": total_5star,
             "total_4star": total_4star,
@@ -215,15 +208,15 @@ class GachaSimRecord(BaseIDModel, table=True):
 # ==================== GachaSimPool (卡池选择表) ====================
 class GachaSimPool(BaseIDModel, table=True):
     """卡池选择表"""
-    
+
     __tablename__ = "GachaSimPool"
     __table_args__ = {"extend_existing": True}
-    
+
     user_id: str = Field(title="用户ID")
     bot_id: str = Field(default="", title="平台")
     pool_type: str = Field(title="卡池类型")
     selected_pool_id: str = Field(default="", title="选中的卡池ID")
-    
+
     @classmethod
     @with_session
     async def get_selected(
@@ -239,7 +232,7 @@ class GachaSimPool(BaseIDModel, table=True):
         result = await session.execute(stmt)
         record = result.scalars().first()
         return record.selected_pool_id if record else None
-    
+
     @classmethod
     @with_session
     async def set_selected(
@@ -250,15 +243,13 @@ class GachaSimPool(BaseIDModel, table=True):
         pool_id: str,
     ) -> None:
         """设置用户选择的卡池"""
-        # 尝试更新
         stmt = (
             update(cls)
             .where(and_(cls.user_id == user_id, cls.pool_type == pool_type))
             .values(selected_pool_id=pool_id)
         )
         result = await session.execute(stmt)
-        
-        # 如果没有更新任何行，则插入新记录
+
         if result.rowcount == 0:
             session.add(cls(
                 user_id=user_id,
@@ -270,20 +261,20 @@ class GachaSimPool(BaseIDModel, table=True):
 # ==================== GachaSimDaily (每日计数表) ====================
 class GachaSimDaily(BaseIDModel, table=True):
     """每日计数表"""
-    
+
     __tablename__ = "GachaSimDaily"
     __table_args__ = {"extend_existing": True}
-    
+
     user_id: str = Field(title="用户ID")
     pool_type: str = Field(title="卡池类型")
     date: str = Field(title="日期")
     count: int = Field(default=0, title="抽卡次数")
-    
+
     @classmethod
     def _today(cls) -> str:
         """获取今天的日期字符串"""
         return date.today().strftime("%Y-%m-%d")
-    
+
     @classmethod
     @with_session
     async def get_daily_count(
@@ -304,7 +295,7 @@ class GachaSimDaily(BaseIDModel, table=True):
         result = await session.execute(stmt)
         record = result.scalars().first()
         return record.count if record else 0
-    
+
     @classmethod
     @with_session
     async def add_daily_count(
@@ -316,8 +307,7 @@ class GachaSimDaily(BaseIDModel, table=True):
     ) -> None:
         """增加每日次数"""
         today = cls._today()
-        
-        # 尝试更新
+
         stmt = (
             update(cls)
             .where(
@@ -330,8 +320,7 @@ class GachaSimDaily(BaseIDModel, table=True):
             .values(count=cls.count + count)
         )
         result = await session.execute(stmt)
-        
-        # 如果没有更新任何行，则插入新记录
+
         if result.rowcount == 0:
             session.add(cls(
                 user_id=user_id,
@@ -344,14 +333,14 @@ class GachaSimDaily(BaseIDModel, table=True):
 # ==================== GachaSimSignature (特征码表) ====================
 class GachaSimSignature(BaseIDModel, table=True):
     """用户特征码表"""
-    
+
     __tablename__ = "GachaSimSignature"
     __table_args__ = {"extend_existing": True}
-    
+
     user_id: str = Field(title="用户ID")
     bot_id: str = Field(default="", title="平台")
     signature_code: str = Field(title="9位数字特征码")
-    
+
     @classmethod
     @with_session
     async def get_signature(
@@ -364,7 +353,7 @@ class GachaSimSignature(BaseIDModel, table=True):
         result = await session.execute(stmt)
         record = result.scalars().first()
         return record.signature_code if record else None
-    
+
     @classmethod
     @with_session
     async def set_signature(
@@ -374,13 +363,11 @@ class GachaSimSignature(BaseIDModel, table=True):
         code: str,
     ) -> None:
         """设置/更新用户特征码"""
-        # 先查询是否存在
         stmt = select(cls).where(cls.user_id == user_id)
         result = await session.execute(stmt)
         record = result.scalars().first()
-        
+
         if record:
-            # 更新现有记录
             stmt = (
                 update(cls)
                 .where(cls.user_id == user_id)
@@ -388,12 +375,11 @@ class GachaSimSignature(BaseIDModel, table=True):
             )
             await session.execute(stmt)
         else:
-            # 插入新记录
             session.add(cls(
                 user_id=user_id,
                 signature_code=code,
             ))
-    
+
     @classmethod
     @with_session
     async def check_code_exists(
