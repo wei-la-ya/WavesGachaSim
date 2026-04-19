@@ -547,8 +547,7 @@ async def switch_weapon_pool(bot: Bot, ev: Event):
             await bot.send(MessageSegment.image(img))
         else:
             pool_list_text = "**可选武器卡池列表：**\n\n"
-            char_count = len(limited_char_pools)
-            for i, p in enumerate(limited_weapon_pools, char_count + 1):
+            for i, p in enumerate(limited_weapon_pools, 1):
                 pool_list_text += f"{i}. {p.get('name', '未知')}\n"
             pool_list_text += f"\n请回复 `{prefix}切换武器卡池 + 编号` 或 `{prefix}切换武器卡池 + 名称` 来选择武器卡池~"
             if current_weapon:
@@ -562,15 +561,12 @@ async def switch_weapon_pool(bot: Bot, ev: Event):
         return
 
     # 有参数 → 执行选择（武器池）
-    # 图片里武器池编号 = char_count + weapon_pool_index + 1
+    # 武器池使用独立编号，从1开始
     selected_pool = None
-    char_count = len(limited_char_pools)
     if user_input.isdigit():
         idx = int(user_input)
-        # 用户输入的编号在图片里是 char_count + 1 起
-        weapon_idx = idx - char_count
-        if 1 <= weapon_idx <= len(limited_weapon_pools):
-            selected_pool = limited_weapon_pools[weapon_idx - 1].get("id")
+        if 1 <= idx <= len(limited_weapon_pools):
+            selected_pool = limited_weapon_pools[idx - 1].get("id")
     else:
         for p in limited_weapon_pools:
             if user_input in p.get("name", ""):
