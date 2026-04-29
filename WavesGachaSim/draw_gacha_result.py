@@ -683,13 +683,43 @@ async def render_pool_select(
 
 
 
-# 模拟抽卡记录图片渲染（暂时留下入口，后续再写）
+# 模拟抽卡记录图片渲染（xwuid同款样式）
+
+
+# XutheringWavesUID 资源路径
+_XW_UID_TEXTURE_PATH = Path(__file__).parent.parent.parent / "XutheringWavesUID" / "XutheringWavesUID" / "wutheringwaves_gachalog" / "texture2d"
+
+HOMO_TAG = ["非到极致", "运气不好", "平稳保底", "小欧一把", "欧狗在此"]
+
+gacha_type_meta_rename = {
+    "limited_char": "限定角色调谐",
+    "limited_weapon": "限定武器调谐",
+    "standard_char": "角色常驻调谐",
+    "standard_weapon": "武器常驻调谐",
+}
+
+
+def _get_level_from_list(ast: int, lst: List) -> int:
+    if ast == 0:
+        return 2
+    for num_index, num in enumerate(lst):
+        if ast <= num:
+            level = 4 - num_index
+            break
+    else:
+        level = 0
+    return level
+
+
+def _format_timestamp(ts: int) -> str:
+    """将时间戳转换为 YYYY-MM-DD HH:MM:SS 格式"""
+    from datetime import datetime
+    return datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S")
 
 
 async def render_gacha_log_image(
     records: List[Dict[str, Any]],
     signature_code: str = "",
-    pool_name: str = "全部卡池",
 ) -> Optional[bytes]:
     """
     渲染模拟抽卡记录为图片（xwuid同款样式）
@@ -697,187 +727,322 @@ async def render_gacha_log_image(
     Args:
         records: 5星历史记录列表
         signature_code: 用户特征码
-        pool_name: 卡池名称
 
     Returns:
         图片 bytes, 或 None (渲染失败)
     """
     try:
-        from PIL import Image, ImageDraw, ImageFont
+        from PIL import Image, ImageDraw
+        import random
         import math
     except ImportError:
         logger.warning("[模拟抽卡] PIL 不可用，无法渲染抽卡记录图片")
         return None
 
-    # 颜色定义
-    GOLD = (255, 215, 0)
-    PURPLE = (180, 124, 252)
-    BLUE = (100, 149, 237)
-    WHITE = (255, 255, 255)
-    DARK_BG = (25, 25, 35)
-    SECTION_BG = (35, 35, 50)
-    GRAY = (157, 157, 157)
-    LIGHT_GRAY = (180, 180, 180)
+    # 尝试导入 XutheringWavesUID 字体和工具
+    try:
+        from XutheringWavesUID.XutheringWavesUID.utils.fonts.waves_fonts import (
+            waves_font_18,
+            waves_font_20,
+            waves_font_23,
+            waves_font_24,
+            waves_font_25,
+            waves_font_30,
+            waves_font_32,
+            waves_font_40,
+        )
+        from gsuid_core.utils.image.convert import convert_img
+        from gsuid_core.utils.image.image_tools import crop_center_img
+        from XutheringWavesUID.XutheringWavesUID.utils.image import (
+            get_waves_bg,
+            add_footer,
+            get_square_avatar,
+            get_square_weapon,
+            cropped_square_avatar,
+        )
+        from XutheringWavesUID.XutheringWavesUID.utils.resource.RESOURCE_PATH import AVATAR_PATH
+        _XW_UID_AVAILABLE = True
+    except ImportError as e:
+        logger.warning(f"[模拟抽卡] XutheringWavesUID 渲染资源不可用: {e}")
+        _XW_UID_AVAILABLE = False
 
-    # 尺寸参数
-    CARD_W = 130
-    CARD_H = 130
-    CARDS_PER_ROW = 5
-    CARD_GAP = 15
-    SECTION_H = 280  # 每个卡池区块高度
-    HEADER_H = 120
-    FOOTER_H = 60
+    # 颜色
+    GOLD = (255, 215, 0)
+    WHITE = (255, 255, 255)
+    GRAY = (157, 157, 157)
 
     if not records:
-        # 空记录图
         h = 400
-        img = Image.new('RGB', (1000, h), DARK_BG)
+        img = Image.new("RGB", (1000, h), (25, 25, 35))
         draw = ImageDraw.Draw(img)
-        try:
-            font_large = ImageFont.truetype("msyh.ttc", 40)
-            font_small = ImageFont.truetype("msyh.ttc", 24)
-        except Exception:
-            font_large = ImageFont.load_default()
-            font_small = font_large
-        draw.text((500, 160), "模拟抽卡", GOLD, font_large, "mm")
-        draw.text((500, 220), "暂无抽卡记录", GRAY, font_small, "mm")
-        draw.text((500, 270), "进行模拟抽卡后将显示记录", GRAY, font_small, "mm")
-        if signature_code:
-            draw.text((500, 340), f"特征码: {signature_code}", GOLD, font_small, "mm")
+        if _XW_UID_AVAILABLE:
+            draw.text((500, 160), "模拟抽卡", GOLD, waves_font_40, "mm")
+            draw.text((500, 220), "暂无抽卡记录", GRAY, waves_font_20, "mm")
+            draw.text((500, 270), "进行模拟抽卡后将显示记录", GRAY, waves_font_20, "mm")
+            if signature_code:
+                draw.text((500, 340), f"特征码: {signature_code}", GOLD, waves_font_25, "mm")
+        else:
+            draw.text((500, 200), "模拟抽卡 - 暂无记录", WHITE, ImageFont.load_default(), "mm")
         buf = BytesIO()
-        img.save(buf, format='PNG', quality=95)
+        img.save(buf, format="PNG", quality=95)
         return buf.getvalue()
 
-    # 按卡池分组
-    pools_data: Dict[str, List] = {}
+    # 将 WavesGachaSim 记录转换为 xwuid 格式
+    # WavesGachaSim: name, star, item_type, is_up, pity_count, pool_type, created_at
+    # xwuid格式: name, resourceType, resourceId, qualityLevel, is_up, gacha_num, time
+
+    # 按卡池分组，统计每个卡池
+    pools_data: Dict[str, Dict] = {}
     for r in records:
-        pt = r.get('pool_type', 'unknown')
+        pt = r.get("pool_type", "unknown")
         if pt not in pools_data:
-            pools_data[pt] = []
-        pools_data[pt].append(r)
+            pools_data[pt] = {
+                "total": 0,
+                "avg": 0,
+                "avg_up": 0,
+                "remain": 0,
+                "r_num": [],
+                "up_list": [],
+                "rank_s_list": [],
+                "time_range": "",
+                "all_time": "",
+                "level": 0,
+            }
 
-    # 计算图片高度
-    pool_count = len(pools_data)
-    total_height = HEADER_H + pool_count * SECTION_H + FOOTER_H
+    for pt, pool_d in pools_data.items():
+        num = 1
+        pool_records = [r for r in records if r.get("pool_type") == pt]
+        for record in pool_records:
+            record["time"] = _format_timestamp(record.get("created_at", 0))
+            # 转换字段名以匹配 xwuid 格式
+            record["qualityLevel"] = record.get("star", 5)
+            record["resourceType"] = "武器" if record.get("type") == "weapon" else "角色"
+            # 查找 resourceId
+            rid = record.get("resource_id", "")
+            if not rid:
+                if record.get("type") == "weapon" and weapon_name_to_weapon_id:
+                    rid = weapon_name_to_weapon_id(record["name"]) or ""
+                elif record.get("type") == "character" and char_name_to_char_id:
+                    rid = char_name_to_char_id(record["name"]) or ""
+            record["resourceId"] = rid
 
-    img = Image.new('RGB', (1000, total_height), DARK_BG)
-    draw = ImageDraw.Draw(img)
+            if record["qualityLevel"] == 5:
+                record["gacha_num"] = num
+                pool_d["r_num"].append(num)
+                pool_d["rank_s_list"].append(record)
+                if record.get("is_up"):
+                    pool_d["up_list"].append(record)
+                num = 1
+            else:
+                num += 1
+            pool_d["total"] += 1
+        pool_d["remain"] = num - 1
 
-    try:
-        font_title = ImageFont.truetype("msyh.ttc", 36)
-        font_bold = ImageFont.truetype("msyh.ttc", 24)
-        font_normal = ImageFont.truetype("msyh.ttc", 20)
-        font_small = ImageFont.truetype("msyh.ttc", 16)
-    except Exception:
-        font_title = font_bold = font_normal = font_small = ImageFont.load_default()
-
-    # 顶部标题栏
-    for y in range(HEADER_H):
-        alpha = int(30 * (1 - y / HEADER_H))
-        draw.rectangle([(0, y), (1000, y + 1)],
-                      fill=(40 + alpha, 35 + alpha, 55 + alpha))
-
-    # "模拟抽卡"红色标签
-    draw.rectangle([(30, 25), (200, 65)], fill=(200, 60, 60))
-    draw.text((115, 45), "模拟抽卡", WHITE, font_title, "mm")
-
-    # 统计信息
-    total_5star = len(records)
-    total_pulls = sum(r.get('pity_count', 0) for r in records) or 0
-    avg_pity = round(total_pulls / total_5star, 1) if total_5star > 0 else 0
-    up_count = len([r for r in records if r.get('is_up', False)])
-
-    draw.text((970, 35), f"五星: {total_5star}  平均:{avg_pity}抽  UP:{up_count}",
-              LIGHT_GRAY, font_normal, "rm")
-
-    # 特征码
-    if signature_code:
-        draw.text((970, 65), f"特征码: {signature_code}", GOLD, font_normal, "rm")
-
-    # 分隔线
-    draw.line([(30, HEADER_H - 10), (970, HEADER_H - 10)], fill=(60, 60, 80), width=2)
-
-    # 卡池名称映射
-    POOL_NAMES = {
-        'limited_char': '限定角色池',
-        'limited_weapon': '限定武器池',
-        'standard_char': '常驻角色池',
-        'standard_weapon': '常驻武器池',
+    # 计算各卡池平均值和等级
+    POOL_LEVEL_LST = {
+        "limited_char": [74, 87, 99, 105, 120],
+        "standard_char": [45, 52, 59, 65, 70],
+        "standard_weapon": [45, 52, 59, 65, 70],
+        "limited_weapon": [45, 52, 59, 65, 70],
     }
 
-    # 绘制每个卡池区块
-    y_offset = HEADER_H
-    for pool_type, pool_records in pools_data.items():
-        pool_display_name = POOL_NAMES.get(pool_type, pool_type)
+    for pt, pool_d in pools_data.items():
+        if pool_d["rank_s_list"]:
+            _d = sum(pool_d["r_num"]) / len(pool_d["r_num"])
+            pool_d["avg"] = float(f"{_d:.2f}")
+        if pool_d["up_list"]:
+            _u = sum(pool_d["r_num"]) / len(pool_d["up_list"])
+            pool_d["avg_up"] = float(f"{_u:.2f}")
 
-        # 区块背景
-        draw.rectangle([(30, y_offset), (970, y_offset + SECTION_H - 20)],
-                       fill=SECTION_BG)
+        pool_d["level"] = 2
+        lvl_lst = POOL_LEVEL_LST.get(pt, [45, 52, 59, 65, 70])
+        if pool_d["avg_up"] != 0:
+            pool_d["level"] = _get_level_from_list(pool_d["avg_up"], lvl_lst)
+        elif pool_d["avg"] != 0:
+            pool_d["level"] = _get_level_from_list(pool_d["avg"], lvl_lst)
 
-        # 卡池名称
-        draw.text((50, y_offset + 30), pool_display_name, WHITE, font_bold, "lm")
+    # 计算布局尺寸
+    oset = 280
+    bset = 170
 
-        # 统计
-        pool_up = len([r for r in pool_records if r.get('is_up', False)])
-        draw.text((970, y_offset + 30), f"五星:{len(pool_records)}  UP:{pool_up}",
-                  LIGHT_GRAY, font_normal, "rm")
+    _numlen = 0
+    for name in pools_data:
+        _num = len(pools_data[name]["rank_s_list"])
+        if _num == 0:
+            _numlen += 50
+        else:
+            _numlen += bset * ((_num - 1) // 5 + 1)
 
-        # 分隔线
-        draw.line([(50, y_offset + 65), (950, y_offset + 65)],
-                  fill=(60, 60, 80), width=1)
+    _header = 380
+    footer = 50
+    pool_count = len(pools_data)
+    w, h = 1000, _header + pool_count * oset + _numlen + footer
 
-        # 绘制5星卡片（最新的在前）
-        sorted_records = sorted(pool_records, key=lambda x: x.get('created_at', 0), reverse=True)
-        for idx, record in enumerate(sorted_records[:10]):  # 最多显示10个
-            cx = 50 + (idx % CARDS_PER_ROW) * (CARD_W + CARD_GAP)
-            cy = y_offset + 80 + (idx // CARDS_PER_ROW) * (CARD_H + 10)
+    if _XW_UID_AVAILABLE:
+        card_img = get_waves_bg(w, h)
+    else:
+        card_img = Image.new("RGB", (w, h), (25, 25, 35))
+    card_draw = ImageDraw.Draw(card_img)
 
-            # 卡片背景
-            star = record.get('star', 5)
-            if star == 5:
-                card_color = GOLD
-            elif star == 4:
-                card_color = PURPLE
+    # 加载纹理资源
+    if _XW_UID_AVAILABLE:
+        item_fg = Image.open(_XW_UID_TEXTURE_PATH / "char_bg.png").convert("RGBA")
+        up_icon = Image.open(_XW_UID_TEXTURE_PATH / "up_tag.png").convert("RGBA")
+        up_icon = up_icon.resize((68, 52))
+        level_path = _XW_UID_TEXTURE_PATH.parent / "texture2d"
+    else:
+        item_fg = None
+        up_icon = None
+        level_path = None
+
+    async def _draw_pic(item: Dict) -> Image.Image:
+        """绘制单个五星卡片"""
+        item_bg = Image.new("RGBA", (167, 170))
+        if item_fg:
+            item_fg_cp = item_fg.copy()
+            item_bg.paste(item_fg_cp, (0, 0), item_fg_cp)
+
+        item_temp = Image.new("RGBA", (167, 170))
+        resource_id = item.get("resourceId", "")
+        item_type = item.get("resourceType", "角色")
+
+        try:
+            if item_type == "武器":
+                if _XW_UID_AVAILABLE:
+                    item_icon = await get_square_weapon(resource_id)
+                    item_icon = item_icon.resize((130, 130)).convert("RGBA")
+                    item_temp.paste(item_icon, (22, 0), item_icon)
             else:
-                card_color = BLUE
+                if _XW_UID_AVAILABLE:
+                    item_icon = await get_square_avatar(resource_id)
+                    item_icon = await cropped_square_avatar(item_icon, 130)
+                    item_temp.paste(item_icon, (22, 0), item_icon)
+        except Exception:
+            pass
 
-            # 简化卡片：只显示名称和抽数
-            card_bg = Image.new('RGB', (CARD_W, CARD_H - 20), (40, 40, 55))
-            card_draw = ImageDraw.Draw(card_bg)
+        item_bg.paste(item_temp, (-2, -2), item_temp)
 
-            # 星级标签
-            star_text = "★" * star
-            card_draw.text((CARD_W // 2, 15), star_text, card_color, font_small, "mm")
+        gnum = item.get("gacha_num", 0)
+        if gnum >= 70:
+            gcolor = (230, 58, 58)
+        elif gnum <= 40:
+            gcolor = (43, 210, 43)
+        else:
+            gcolor = "white"
 
-            # 名称
-            name = record.get('name', '?')
-            if len(name) > 5:
-                name = name[:5] + '…'
-            card_draw.text((CARD_W // 2, 45), name, WHITE, font_small, "mm")
+        info_block = Image.new("RGBA", (137, 28), color=(255, 255, 255, 0))
+        info_block_draw = ImageDraw.Draw(info_block)
+        info_block_draw.rectangle([0, 0, 137, 28], fill=(0, 0, 0, int(0.6 * 255)))
+        if _XW_UID_AVAILABLE:
+            info_block_draw.text((65, 12), f"{gnum}抽", gcolor, waves_font_20, "mm")
+        else:
+            info_block_draw.text((65, 12), f"{gnum}抽", gcolor, ImageFont.load_default(), "mm")
+        item_bg.paste(info_block, (15, 130), info_block)
 
-            # 抽数
-            pity = record.get('pity_count', 0)
-            if pity:
-                pity_color = (255, 80, 80) if pity >= 70 else (100, 200, 100) if pity <= 40 else WHITE
-                card_draw.text((CARD_W // 2, 75), f"{pity}抽", pity_color, font_small, "mm")
+        if item.get("is_up") and up_icon:
+            up_icon_cp = up_icon.copy()
+            item_bg.paste(up_icon_cp, (88, 3), up_icon_cp)
+        return item_bg
 
-            # UP标签
-            if record.get('is_up', False):
-                draw.rectangle([(cx + CARD_W - 30, cy), (cx + CARD_W, cy + 20)],
-                              fill=(255, 60, 60))
-                draw.text((cx + CARD_W - 15, cy + 10), "UP", WHITE, ImageFont.load_default(), "mm")
+    y = 0
+    gindex = 0
 
-            img.paste(card_bg, (cx, cy))
+    POOL_DISPLAY_NAMES = {
+        "limited_char": "限定角色调谐",
+        "limited_weapon": "限定武器调谐",
+        "standard_char": "角色常驻调谐",
+        "standard_weapon": "武器常驻调谐",
+    }
 
-        y_offset += SECTION_H
+    for pool_type, gacha_data in pools_data.items():
+        if not gacha_data["rank_s_list"]:
+            gindex += 1
+            continue
 
-    # 底部提示
-    if len(records) > 10 * len(pools_data):
-        draw.text((500, total_height - 35),
-                  f"... 还有 {len(records) - 10 * len(pools_data)} 条记录未显示",
-                  GRAY, font_small, "mm")
+        title = Image.new("RGBA", (980, 250), (0, 0, 0, 0))
+        if _XW_UID_AVAILABLE and (level_path / "bar.png").exists():
+            title = Image.open(level_path / "bar.png").convert("RGBA")
+        title_draw = ImageDraw.Draw(title)
+
+        remain_s = f"{gacha_data['remain']}"
+        avg_s = f"{gacha_data['avg']}"
+        avg_up_s = f"{gacha_data['avg_up']}"
+        total_s = f"{gacha_data['total']}"
+        level = gacha_data["level"]
+
+        pool_display_name = POOL_DISPLAY_NAMES.get(pool_type, pool_type)
+
+        # 绘制标题栏信息
+        if _XW_UID_AVAILABLE:
+            title_draw.text((110, 80), pool_display_name, WHITE, waves_font_40, "lm")
+            title_draw.text((160, 178), avg_s, WHITE, waves_font_32, "mm")
+            title_draw.text((300, 178), avg_up_s, WHITE, waves_font_32, "mm")
+            title_draw.text((457, 178), total_s, WHITE, waves_font_32, "mm")
+            title_draw.text((380, 87), "已", WHITE, waves_font_23, "rm")
+            title_draw.text((410, 84), remain_s, (255, 80, 80), waves_font_40, "mm")
+            title_draw.text((530, 87), "抽未出金", WHITE, waves_font_23, "rm")
+
+            # 等级图标
+            lvl_dir = level_path / str(level)
+            if lvl_dir.exists():
+                level_files = list(lvl_dir.iterdir())
+                if level_files:
+                    level_icon = Image.open(random.choice(level_files)).convert("RGBA")
+                    level_icon = level_icon.resize((140, 140)).convert("RGBA")
+                    title.paste(level_icon, (710, 51), level_icon)
+            tag = HOMO_TAG[level]
+            title_draw.text((783, 225), tag, WHITE, waves_font_24, "mm")
+        else:
+            title_draw.text((50, 50), pool_display_name, WHITE, ImageFont.load_default(), "lm")
+            title_draw.text((300, 120), f"均{avg_s}抽 UP均{avg_up_s} 总{total_s} 已{remain_s}抽未出金", WHITE, ImageFont.load_default(), "lm")
+
+        card_img.paste(title, (10, _header + y + gindex * oset), title)
+        gindex += 1
+
+        s_list = gacha_data["rank_s_list"]
+        s_list.reverse()
+
+        for idx, item in enumerate(s_list):
+            item_bg = await _draw_pic(item)
+            _x = 95 + 162 * (idx % 5)
+            _y = _header + bset * (idx // 5) + y + gindex * oset
+            card_img.paste(item_bg, (_x, _y), item_bg)
+
+        if s_list:
+            y += bset * ((len(s_list) - 1) // 5 + 1)
+        else:
+            y += 50
+
+    # 顶部标题区
+    if _XW_UID_AVAILABLE:
+        # 签名码标题
+        title_layer = Image.new("RGBA", (1000, _header), (0, 0, 0, 0))
+        title_draw = ImageDraw.Draw(title_layer)
+        if signature_code:
+            title_draw.text((500, 30), f"模拟抽卡记录  特征码: {signature_code}", GOLD, waves_font_30, "mm")
+        else:
+            title_draw.text((500, 30), "模拟抽卡记录", GOLD, waves_font_30, "mm")
+        card_img.paste(title_layer, (0, 0), title_layer)
+
+        # 总统计
+        total_5star = len(records)
+        total_pulls = sum(r.get("pity_count", 0) for r in records) or 0
+        avg_pity = round(total_pulls / total_5star, 1) if total_5star > 0 else 0
+        up_count = len([r for r in records if r.get("is_up", False)])
+        stats_draw = ImageDraw.Draw(card_img)
+        stats_draw.text(
+            (970, _header - 60),
+            f"五星:{total_5star}  均{avg_pity}抽  UP:{up_count}",
+            GRAY, waves_font_20, "rm",
+        )
+    else:
+        card_draw.text((500, 50), "模拟抽卡记录", GOLD, ImageFont.load_default(), "mm")
+
+    if _XW_UID_AVAILABLE:
+        card_img = add_footer(card_img, 600, 20)
+        card_img = await convert_img(card_img)
 
     buf = BytesIO()
-    img.save(buf, format='PNG', quality=95)
+    card_img.save(buf, format="PNG", quality=95)
     return buf.getvalue()
 
