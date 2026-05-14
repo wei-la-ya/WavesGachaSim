@@ -576,72 +576,56 @@ async def render_pool_select(
         logger.warning("[模拟抽卡] 远程渲染未开启且本地渲染模块不可用，无法渲染")
         return None
 
-    # 构造模板数据
-    char_idx = start_index
-    weapon_idx = 1
-    char_pool_data = []
-    for p in char_pools:
-        up5_names = "、".join([item["name"] for item in p.get("up", {}).get("5star", [])])
-        # 简化时间显示
-        start_time = p.get("startTime", "")
-        end_time = p.get("endTime", "")
-        if start_time and end_time:
-            # 只取日期部分
-            start_date = start_time.split(" ")[0] if " " in start_time else start_time
-            end_date = end_time.split(" ")[0] if " " in end_time else end_time
-            time_range = f"{start_date} ~ {end_date}"
-        else:
-            time_range = ""
+    from .pool_manager import get_pool_pic_as_base64
 
-        char_pool_data.append({
-            "index": char_idx,
-            "id": p.get("id", ""),
-            "name": p.get("name", "未知"),
-            "pic": p.get("pic", ""),
-            "up5_names": up5_names,
-            "time_range": time_range,
-            "pool_type": "char",
-        })
-        char_idx += 1
+    def build_pool_context(pools: list, start_idx: int, pool_label: str) -> tuple:
+        """构建卡池模板数据"""
+        idx = start_idx
+        result = []
+        for p in pools:
+            up5_names = "、".join([item["name"] for item in p.get("up", {}).get("5star", [])])
+            start_time = p.get("startTime", "")
+            end_time = p.get("endTime", "")
+            if start_time and end_time:
+                start_date = start_time.split(" ")[0] if " " in start_time else start_time
+                end_date = end_time.split(" ")[0] if " " in end_time else end_time
+                time_range = f"{start_date} ~ {end_date}"
+            else:
+                time_range = ""
+            result.append({
+                "index": idx,
+                "id": p.get("id", ""),
+                "name": p.get("name", "未知"),
+                "pic": p.get("pic", ""),
+                "up5_names": up5_names,
+                "time_range": time_range,
+                "pool_type": pool_label,
+            })
+            idx += 1
+        return result, idx
 
-    weapon_pool_data = []
-    for p in weapon_pools:
-        up5_names = "、".join([item["name"] for item in p.get("up", {}).get("5star", [])])
-        start_time = p.get("startTime", "")
-        end_time = p.get("endTime", "")
-        if start_time and end_time:
-            start_date = start_time.split(" ")[0] if " " in start_time else start_time
-            end_date = end_time.split(" ")[0] if " " in end_time else end_time
-            time_range = f"{start_date} ~ {end_date}"
-        else:
-            time_range = ""
+    char_pool_data, _ = build_pool_context(char_pools, start_index, "char")
+    weapon_pool_data, _ = build_pool_context(weapon_pools, 1, "weapon")
 
-        weapon_pool_data.append({
-            "index": weapon_idx,
-            "id": p.get("id", ""),
-            "name": p.get("name", "未知"),
-            "pic": p.get("pic", ""),
-            "up5_names": up5_names,
-            "time_range": time_range,
-            "pool_type": "weapon",
-        })
-        weapon_idx += 1
+    # 图片转 base64（嵌入 HTML，两种渲染方式都适用）
+    for p in char_pool_data:
+        p["pic"] = await get_pool_pic_as_base64(p["pic"])
+    for p in weapon_pool_data:
+        p["pic"] = await get_pool_pic_as_base64(p["pic"])
 
+    font_css_url = GachaSimConfig.get_config("GachaSimFontCssUrl").data
     context = {
         "char_pools": char_pool_data,
         "weapon_pools": weapon_pool_data,
         "selected_char_id": selected_char_id,
         "selected_weapon_id": selected_weapon_id,
         "prefix": prefix,
+        "font_css_url": font_css_url,
     }
 
-    # 远程渲染配置
-    font_css_url = GachaSimConfig.get_config("GachaSimFontCssUrl").data
-
-    # 尝试远程渲染
+    # 远程渲染
     if has_remote:
         try:
-            context["font_css_url"] = font_css_url
             template = gacha_sim_templates.get_template("pool_select.html")
             html_content = template.render(**context)
 

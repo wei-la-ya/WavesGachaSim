@@ -1,5 +1,7 @@
 """鸣潮抽卡模拟器 - 卡池管理"""
 import asyncio
+import hashlib
+import httpx
 import json
 from datetime import date, datetime
 from pathlib import Path
@@ -30,9 +32,52 @@ CONFIG_DIR = Path(__file__).parent / "config"
 POOL_DATA_DIR = get_res_path() / "WavesGachaSim"
 POOL_DATA_DIR.mkdir(parents=True, exist_ok=True)
 POOL_CACHE_FILE = POOL_DATA_DIR / "cached_pools.json"
+# 卡池封面图片缓存目录
+POOL_PIC_CACHE_DIR = POOL_DATA_DIR / "pool_pics"
+POOL_PIC_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 # 常驻5星角色 (用于限定角色池歪的情况)
 STANDARD_5STAR_CHARACTERS = ["鉴心", "卡卡罗", "维里奈", "凌阳", "安可"]
+
+
+async def get_pool_pic_as_base64(pic_url: str) -> str:
+    """
+    获取封面图片的 base64 data URL。
+    优先用本地缓存（已下载则直接用），本地没有则下载后缓存并转 base64。
+    获取失败时返回原始 URL 字符串（远程渲染时可尝试直接访问）。
+    """
+    if not pic_url:
+        return pic_url
+
+    # 用 URL 的 MD5 做文件名，避免特殊字符问题
+    url_hash = hashlib.md5(pic_url.encode()).hexdigest()
+    ext = Path(pic_url).suffix or ".jpg"
+    cache_path = POOL_PIC_CACHE_DIR / f"{url_hash}{ext}"
+
+    # 已有本地缓存
+    if cache_path.exists():
+        try:
+            from gsuid_core.utils.image.image_tools import image_to_base64
+            return image_to_base64(cache_path)
+        except Exception:
+            pass
+
+    # 下载并缓存
+    try:
+        client = httpx.AsyncClient(timeout=15)
+        resp = await client.get(pic_url)
+        await client.aclose()
+        if resp.status_code == 200:
+            with open(cache_path, "wb") as f:
+                f.write(resp.content)
+            logger.info(f"[模拟抽卡] 缓存封面图片: {cache_path.name}")
+            from gsuid_core.utils.image.image_tools import image_to_base64
+            return image_to_base64(cache_path)
+    except Exception as e:
+        logger.warning(f"[模拟抽卡] 下载封面失败 {pic_url}: {e}")
+
+    # 下载失败时返回原始 URL（远程渲染可尝试直接访问）
+    return pic_url
 
 
 class PoolManager:
@@ -139,84 +184,106 @@ class PoolManager:
             pools: List[Dict] = []
             weapons_3star = self._load_3star_weapons()
 
-        for raw in api_pools:
-            try:
-                wp = WavesPool.model_validate(raw) if WavesPool else None
-            except Exception:
-                wp = None
+            # 构建图片兜底映射：从本地缓存的旧卡池中按五星名称+类型找 pic
+            pic_fallback: Dict[str, str] = {}
+            if self._cached_limited_pools:
+                for old_pool in self._cached_limited_pools:
+                    old_pic = old_pool.get("pic", "")
+                    if old_pic:
+                        old_type = old_pool.get("type", "")
+                        for item in old_pool.get("up", {}).get("5star", []):
+                            key = f"{item.get('name', '')}|{old_type}"
+                            if key not in pic_fallback:
+                                pic_fallback[key] = old_pic
 
-            if wp is None:
-                continue
+            for raw in api_pools:
+                try:
+                    wp = WavesPool.model_validate(raw) if WavesPool else None
+                except Exception:
+                    wp = None
 
-            # 判断类型
-            if wp.pool_type == "角色活动唤取":
-                ptype = "limited_char"
-            elif wp.pool_type == "武器活动唤取":
-                ptype = "limited_weapon"
-            else:
-                continue
+                if wp is None:
+                    continue
 
-            # 构造 UP 5星列表
-            up5: List[Dict] = []
-            for fid, fname in zip(wp.five_star_ids, wp.five_star_names):
-                item_type = "weapon" if ptype == "limited_weapon" else "character"
-                up5.append({"name": fname, "type": item_type, "resource_id": fid})
+                # 判断类型
+                if wp.pool_type == "角色活动唤取":
+                    ptype = "limited_char"
+                elif wp.pool_type == "武器活动唤取":
+                    ptype = "limited_weapon"
+                else:
+                    continue
 
-            # 构造 UP 4星列表
-            up4: List[Dict] = []
-            for fid, fname in zip(wp.four_star_ids, wp.four_star_names):
-                # 4星可能混有角色和武器，通过 id 前缀判断
-                # 角色 id 一般 1xxx，武器 id 一般 2xxxx
-                item_type = "weapon" if fid.startswith("2") else "character"
-                up4.append({"name": fname, "type": item_type, "resource_id": fid})
+                # 构造 UP 5星列表
+                up5: List[Dict] = []
+                for fid, fname in zip(wp.five_star_ids, wp.five_star_names):
+                    item_type = "weapon" if ptype == "limited_weapon" else "character"
+                    up5.append({"name": fname, "type": item_type, "resource_id": fid})
 
-            # 常驻5星 (歪的时候出的)
-            std5: List[Dict] = []
-            if ptype == "limited_char":
-                for name in STANDARD_5STAR_CHARACTERS:
+                # 构造 UP 4星列表
+                up4: List[Dict] = []
+                for fid, fname in zip(wp.four_star_ids, wp.four_star_names):
+                    # 4星可能混有角色和武器，通过 id 前缀判断
+                    # 角色 id 一般 1xxx，武器 id 一般 2xxxx
+                    item_type = "weapon" if fid.startswith("2") else "character"
+                    up4.append({"name": fname, "type": item_type, "resource_id": fid})
+
+                # 常驻5星 (歪的时候出的)
+                std5: List[Dict] = []
+                if ptype == "limited_char":
+                    for name in STANDARD_5STAR_CHARACTERS:
+                        rid = ""
+                        if char_name_to_char_id:
+                            rid = char_name_to_char_id(name) or ""
+                        std5.append({"name": name, "type": "character", "resource_id": rid})
+
+                # 常驻4星直接复用配置
+                std_pools = self._load_standard_pools()
+                if ptype == "limited_char":
+                    sp = std_pools.get("character", {})
+                else:
+                    sp = std_pools.get("weapon", {})
+
+                std4: List[Dict] = []
+                for n in sp.get("4star_characters", []):
                     rid = ""
                     if char_name_to_char_id:
-                        rid = char_name_to_char_id(name) or ""
-                    std5.append({"name": name, "type": "character", "resource_id": rid})
+                        rid = char_name_to_char_id(n) or ""
+                    std4.append({"name": n, "type": "character", "resource_id": rid})
+                for n in sp.get("4star_weapons", []):
+                    rid = ""
+                    if weapon_name_to_weapon_id:
+                        rid = weapon_name_to_weapon_id(n) or ""
+                    std4.append({"name": n, "type": "weapon", "resource_id": rid})
 
-            # 常驻4星直接复用配置
-            std_pools = self._load_standard_pools()
-            if ptype == "limited_char":
-                sp = std_pools.get("character", {})
-            else:
-                sp = std_pools.get("weapon", {})
+                # 构造卡池名称：如果 wp.name 为空，用 UP 五星角色/武器名代替
+                display_name = wp.name
+                if not display_name and wp.five_star_names:
+                    display_name = "、".join(wp.five_star_names)
 
-            std4: List[Dict] = []
-            for n in sp.get("4star_characters", []):
-                rid = ""
-                if char_name_to_char_id:
-                    rid = char_name_to_char_id(n) or ""
-                std4.append({"name": n, "type": "character", "resource_id": rid})
-            for n in sp.get("4star_weapons", []):
-                rid = ""
-                if weapon_name_to_weapon_id:
-                    rid = weapon_name_to_weapon_id(n) or ""
-                std4.append({"name": n, "type": "weapon", "resource_id": rid})
+                pool_id = f"{ptype}_{display_name or wp.title}"
 
-            # 构造卡池名称：如果 wp.name 为空，用 UP 五星角色/武器名代替
-            display_name = wp.name
-            if not display_name and wp.five_star_names:
-                display_name = "、".join(wp.five_star_names)
+                # 图片兜底：API 返回的空时，从本地缓存的旧卡池中找同名五星+同类型的 pic
+                pic = wp.pic
+                if not pic:
+                    for item in up5:
+                        fallback_key = f"{item.get('name', '')}|{ptype}"
+                        if fallback_key in pic_fallback:
+                            pic = pic_fallback[fallback_key]
+                            break
 
-            pool_id = f"{ptype}_{display_name or wp.title}"
-            pool_dict: Dict[str, Any] = {
-                "id": pool_id,
-                "name": f"{display_name} · {wp.title}" if display_name else wp.title,
-                "type": ptype,
-                "startTime": wp.start_time,
-                "endTime": wp.end_time,
-                "up": {"5star": up5, "4star": up4},
-                "standard5star": std5,
-                "standard4star": std4,
-                "3star_weapons": weapons_3star,
-                "pic": wp.pic,
-            }
-            pools.append(pool_dict)
+                pool_dict: Dict[str, Any] = {
+                    "id": pool_id,
+                    "name": f"{display_name} · {wp.title}" if display_name else wp.title,
+                    "type": ptype,
+                    "startTime": wp.start_time,
+                    "endTime": wp.end_time,
+                    "up": {"5star": up5, "4star": up4},
+                    "standard5star": std5,
+                    "standard4star": std4,
+                    "3star_weapons": weapons_3star,
+                    "pic": pic,
+                }
+                pools.append(pool_dict)
 
         self._cached_limited_pools = pools
         self._cache_date = today

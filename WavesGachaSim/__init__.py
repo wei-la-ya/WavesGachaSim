@@ -648,33 +648,40 @@ async def bind_signature(bot: Bot, ev: Event):
 
 
 # ==================== 百连抽卡 ====================
-@sv_gacha.on_fullmatch(("抽卡百连",), block=True)
-async def draw_bailian(bot: Bot, ev: Event):
-    """百连抽卡 - 连续10次十连"""
+async def _do_bailian(bot: Bot, ev: Event, pool_type: str, pool_type_name: str):
+    """执行百连抽卡"""
     uid = ev.user_id
-
-    # 检查百连开关（关闭时静默返回）
-    if not GachaSimConfig.get_config("GachaSimEnableBailian").data:
-        return
 
     BAILIAN_COUNT = 10  # 百连 = 10次十连
     SINGLE_COUNT = 10   # 每次十连
 
     # 在加锁前检查每日限制（百连需 100 次）
-    if not await _check_daily_limit(bot, ev, "limited_char", BAILIAN_COUNT):
+    if not await _check_daily_limit(bot, ev, pool_type, BAILIAN_COUNT):
         return
 
     # 同一用户加锁
     async with _UserLockContext(uid):
         # 获取卡池
         await pool_manager.fetch_current_pools()
-        selected_pool_id = await data_manager.get_selected_pool(uid, "limited_char")
+        selected_pool_id = await data_manager.get_selected_pool(uid, pool_type)
 
         user_switch_all = GachaSimConfig.get_config("GachaSimUserSwitchAll").data
-        if user_switch_all:
-            available_pools = await pool_manager.get_limited_char_pools()
+        if pool_type == "limited_char":
+            if user_switch_all:
+                available_pools = await pool_manager.get_limited_char_pools()
+            else:
+                available_pools = await _get_available_pools("limited_char")
+        elif pool_type == "limited_weapon":
+            if user_switch_all:
+                available_pools = await pool_manager.get_limited_weapon_pools()
+            else:
+                available_pools = await _get_available_pools("limited_weapon")
+        elif pool_type == "standard_char":
+            available_pools = [pool_manager.get_standard_char_pool()]
+        elif pool_type == "standard_weapon":
+            available_pools = [pool_manager.get_standard_weapon_pool()]
         else:
-            available_pools = await _get_available_pools("limited_char")
+            available_pools = []
 
         pool = None
         if selected_pool_id:
@@ -683,13 +690,13 @@ async def draw_bailian(bot: Bot, ev: Event):
                     pool = p
                     break
             if not pool:
-                await data_manager.set_selected_pool(uid, "limited_char", "")
+                await data_manager.set_selected_pool(uid, pool_type, "")
                 selected_pool_id = ""
 
         if not pool and len(available_pools) > 1:
             # 多卡池时未选择 → 发卡池选择图片
             char_pools_show = [p for p in available_pools if p.get("type") == "limited_char"]
-            weapon_pools_show = await _get_available_pools("limited_weapon")
+            weapon_pools_show = [p for p in available_pools if p.get("type") == "limited_weapon"]
             img = await render_pool_select(
                 char_pools=char_pools_show,
                 weapon_pools=weapon_pools_show,
@@ -709,10 +716,10 @@ async def draw_bailian(bot: Bot, ev: Event):
             return
 
         # 获取保底数据
-        pity_data = await data_manager.get_pity_data(uid, "limited_char")
+        pity_data = await data_manager.get_pity_data(uid, pool_type)
 
         at_sender = bool(ev.group_id)
-        await bot.send(f"🎰 开始百连抽卡（共{BAILIAN_COUNT}次十连），请稍候...", at_sender)
+        await bot.send(f"🎰 开始{pool_type_name}百连抽卡（共{BAILIAN_COUNT}次十连），请稍候...", at_sender)
 
         # 执行10次十连抽卡（每次独立调用，保持语义）
         all_results = []
@@ -727,7 +734,7 @@ async def draw_bailian(bot: Bot, ev: Event):
                 # 记录5星
                 for item in results:
                     if item.get("star") == 5:
-                        item["pool_type"] = "limited_char"
+                        item["pool_type"] = pool_type
                         await data_manager.add_five_star_record(uid, ev.bot_id, item)
                 all_results.append((i, results))
             except Exception as e:
@@ -770,8 +777,195 @@ async def draw_bailian(bot: Bot, ev: Event):
         images.sort(key=lambda x: x[0])
 
         # 保存保底数据和每日计数
-        await data_manager.save_pity_data(uid, "limited_char", pity_data)
-        await data_manager.add_daily_count(uid, "limited_char", BAILIAN_COUNT)
+        await data_manager.save_pity_data(uid, pool_type, pity_data)
+        await data_manager.add_daily_count(uid, pool_type, BAILIAN_COUNT)
+
+        if not images:
+            at_sender = True if ev.group_id else False
+            await bot.send("百连抽卡失败，未生成任何图片", at_sender)
+            return
+
+        # 根据配置决定发送方式
+        use_merge = GachaSimConfig.get_config("GachaSimBailianMerge").data
+        if len(images) == 1:
+            await bot.send(MessageSegment.image(images[0][1]))
+        elif use_merge:
+            # 合并转发
+            node_list = [MessageSegment.image(img) for _, img in images]
+            forward_msg = MessageSegment.node(node_list)
+            await bot.send(forward_msg)
+        else:
+            # 一条消息内发多张图片
+            await bot.send([MessageSegment.image(img) for _, img in images])
+
+
+def _parse_bailian_arg(text: str) -> tuple:
+    """解析百连参数，返回 (pool_type, pool_type_name)"""
+    user_input = text.strip() if text else ""
+    if user_input == "武器":
+        return "limited_weapon", "限定武器"
+    elif user_input == "常驻":
+        return "standard_char", "常驻角色"
+    elif user_input == "常驻武器":
+        return "standard_weapon", "常驻武器"
+    return "limited_char", "限定角色"
+
+
+@sv_gacha.on_command(("抽卡百连",), block=True)
+async def draw_bailian(bot: Bot, ev: Event):
+    """百连抽卡 - 连续10次十连，支持武器/常驻池"""
+    if not GachaSimConfig.get_config("GachaSimEnableBailian").data:
+        return
+    pool_type, pool_type_name = _parse_bailian_arg(ev.text)
+    await _do_bailian(bot, ev, pool_type, pool_type_name)
+
+
+@sv_gacha.on_fullmatch(("抽卡百连武器", "抽卡百连常驻", "抽卡百连常驻武器"), block=True)
+async def draw_bailian_fullmatch(bot: Bot, ev: Event):
+    """百连抽卡 - 不带空格的写法"""
+    if not GachaSimConfig.get_config("GachaSimEnableBailian").data:
+        return
+    # 从命令名中提取参数（ev.command 是完整匹配的命令）
+    cmd = ev.command or ev.raw_text.split()[0] if ev.raw_text else ""
+    # 去掉"抽卡百连"前缀得到参数
+    arg = cmd.replace("抽卡百连", "") if cmd else ""
+    pool_type, pool_type_name = _parse_bailian_arg(arg)
+    await _do_bailian(bot, ev, pool_type, pool_type_name)
+
+    pool_type_name = {
+        "limited_char": "限定角色",
+        "limited_weapon": "限定武器",
+        "standard_char": "常驻角色",
+        "standard_weapon": "常驻武器",
+    }.get(pool_type, "限定角色")
+
+    BAILIAN_COUNT = 10  # 百连 = 10次十连
+    SINGLE_COUNT = 10   # 每次十连
+
+    # 在加锁前检查每日限制（百连需 100 次）
+    if not await _check_daily_limit(bot, ev, pool_type, BAILIAN_COUNT):
+        return
+
+    # 同一用户加锁
+    async with _UserLockContext(uid):
+        # 获取卡池
+        await pool_manager.fetch_current_pools()
+        selected_pool_id = await data_manager.get_selected_pool(uid, pool_type)
+
+        user_switch_all = GachaSimConfig.get_config("GachaSimUserSwitchAll").data
+        if pool_type == "limited_char":
+            if user_switch_all:
+                available_pools = await pool_manager.get_limited_char_pools()
+            else:
+                available_pools = await _get_available_pools("limited_char")
+        elif pool_type == "limited_weapon":
+            if user_switch_all:
+                available_pools = await pool_manager.get_limited_weapon_pools()
+            else:
+                available_pools = await _get_available_pools("limited_weapon")
+        elif pool_type == "standard_char":
+            available_pools = [pool_manager.get_standard_char_pool()]
+        elif pool_type == "standard_weapon":
+            available_pools = [pool_manager.get_standard_weapon_pool()]
+        else:
+            available_pools = []
+
+        pool = None
+        if selected_pool_id:
+            for p in available_pools:
+                if p.get("id") == selected_pool_id:
+                    pool = p
+                    break
+            if not pool:
+                await data_manager.set_selected_pool(uid, pool_type, "")
+                selected_pool_id = ""
+
+        if not pool and len(available_pools) > 1:
+            # 多卡池时未选择 → 发卡池选择图片
+            char_pools_show = [p for p in available_pools if p.get("type") == "limited_char"]
+            weapon_pools_show = [p for p in available_pools if p.get("type") == "limited_weapon"]
+            img = await render_pool_select(
+                char_pools=char_pools_show,
+                weapon_pools=weapon_pools_show,
+                start_index=1,
+                prefix=get_plugin_available_prefix("WavesGachaSim"),
+            )
+            if img:
+                await bot.send(MessageSegment.image(img))
+            return
+
+        if not pool:
+            pool = available_pools[0] if available_pools else None
+
+        if not pool:
+            at_sender = True if ev.group_id else False
+            await bot.send("当前没有可用的卡池，请稍后再试~", at_sender)
+            return
+
+        # 获取保底数据
+        pity_data = await data_manager.get_pity_data(uid, pool_type)
+
+        at_sender = bool(ev.group_id)
+        await bot.send(f"🎰 开始{pool_type_name}百连抽卡（共{BAILIAN_COUNT}次十连），请稍候...", at_sender)
+
+        # 执行10次十连抽卡（每次独立调用，保持语义）
+        all_results = []
+        for i in range(BAILIAN_COUNT):
+            try:
+                results = gacha_service.perform_draw(
+                    pool,
+                    pity_data,
+                    pool_manager.get_3star_weapons(),
+                    count=SINGLE_COUNT,
+                )
+                # 记录5星
+                for item in results:
+                    if item.get("star") == 5:
+                        item["pool_type"] = pool_type
+                        await data_manager.add_five_star_record(uid, ev.bot_id, item)
+                all_results.append((i, results))
+            except Exception as e:
+                logger.error(f"[模拟抽卡] 百连第{i + 1}次抽卡失败: {e}")
+
+        # 获取特征码（百连共享同一个特征码）
+        signature_code = await data_manager.get_signature(uid)
+        if not signature_code:
+            signature_code = await data_manager.generate_signature(uid)
+
+        # 并发渲染所有图片
+        async def render_one(idx: int, results: list) -> tuple:
+            try:
+                img_bytes = await render_gacha_result(
+                    results,
+                    pool.get("name", "未知卡池"),
+                    signature_code=signature_code,
+                    draw_type=SINGLE_COUNT,
+                    nickname=ev.sender.get('nickname', '') if ev.sender else '',
+                    avatar=ev.sender.get('avatar', '') if ev.sender else '',
+                )
+                return (idx, img_bytes)
+            except Exception as e:
+                logger.error(f"[模拟抽卡] 百连第{idx + 1}次渲染失败: {e}")
+                return (idx, None)
+
+        render_tasks = [render_one(i, r) for i, r in all_results]
+        render_results = await asyncio.gather(*render_tasks, return_exceptions=True)
+
+        # 收集成功的图片
+        images = []
+        for result in render_results:
+            if isinstance(result, Exception):
+                continue
+            idx, img_bytes = result
+            if img_bytes:
+                images.append((idx, img_bytes))
+
+        # 按原始顺序排序
+        images.sort(key=lambda x: x[0])
+
+        # 保存保底数据和每日计数
+        await data_manager.save_pity_data(uid, pool_type, pity_data)
+        await data_manager.add_daily_count(uid, pool_type, BAILIAN_COUNT)
 
         if not images:
             at_sender = True if ev.group_id else False

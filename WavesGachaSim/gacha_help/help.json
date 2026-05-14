@@ -21,7 +21,7 @@
       {
         "name": "抽卡百连",
         "desc": "连续10次十连（共100抽）⚠️需开启百连功能",
-        "eg": "抽卡百连",
+        "eg": "抽卡百连武器",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false
