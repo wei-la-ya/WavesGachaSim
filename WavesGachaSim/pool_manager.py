@@ -184,17 +184,17 @@ class PoolManager:
             pools: List[Dict] = []
             weapons_3star = self._load_3star_weapons()
 
-            # 构建图片兜底映射：从本地缓存的旧卡池中按五星名称+类型找 pic
-            pic_fallback: Dict[str, str] = {}
-            if self._cached_limited_pools:
+            def _find_fallback_pic(name: str, ptype: str) -> str:
+                """从本地缓存 JSON 里找同名卡池的 pic"""
+                if not self._cached_limited_pools:
+                    return ""
                 for old_pool in self._cached_limited_pools:
-                    old_pic = old_pool.get("pic", "")
-                    if old_pic:
-                        old_type = old_pool.get("type", "")
-                        for item in old_pool.get("up", {}).get("5star", []):
-                            key = f"{item.get('name', '')}|{old_type}"
-                            if key not in pic_fallback:
-                                pic_fallback[key] = old_pic
+                    if old_pool.get("type") != ptype:
+                        continue
+                    for item in old_pool.get("up", {}).get("5star", []):
+                        if item.get("name") == name:
+                            return old_pool.get("pic", "")
+                return ""
 
             for raw in api_pools:
                 try:
@@ -262,13 +262,12 @@ class PoolManager:
 
                 pool_id = f"{ptype}_{display_name or wp.title}"
 
-                # 图片兜底：API 返回的空时，从本地缓存的旧卡池中找同名五星+同类型的 pic
+                # 图片兜底：API 返回的空时，从本地缓存 JSON 里找同名五星+同类型的 pic
                 pic = wp.pic
                 if not pic:
                     for item in up5:
-                        fallback_key = f"{item.get('name', '')}|{ptype}"
-                        if fallback_key in pic_fallback:
-                            pic = pic_fallback[fallback_key]
+                        pic = _find_fallback_pic(item.get("name", ""), ptype)
+                        if pic:
                             break
 
                 pool_dict: Dict[str, Any] = {
