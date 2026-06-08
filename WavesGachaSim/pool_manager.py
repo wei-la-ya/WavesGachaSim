@@ -197,18 +197,43 @@ class PoolManager:
                 return ""
 
             for raw in api_pools:
+                wp = None
                 try:
                     wp = WavesPool.model_validate(raw) if WavesPool else None
                 except Exception:
-                    wp = None
+                    pass
+
+                # 兜底：模型校验失败时直接用字典解析
+                if wp is None and isinstance(raw, dict):
+                    pool_type_raw = raw.get("pool_type", "")
+                    if pool_type_raw in (
+                        "角色活动唤取",
+                        "角色联动唤取",
+                        "武器活动唤取",
+                        "武器联动唤取",
+                    ):
+                        from types import SimpleNamespace
+
+                        wp = SimpleNamespace(
+                            pool_type=pool_type_raw,
+                            five_star_ids=raw.get("five_star_ids", []),
+                            five_star_names=raw.get("five_star_names", []),
+                            four_star_ids=raw.get("four_star_ids", []),
+                            four_star_names=raw.get("four_star_names", []),
+                            name=raw.get("name", ""),
+                            title=raw.get("title", ""),
+                            start_time=raw.get("start_time", ""),
+                            end_time=raw.get("end_time", ""),
+                            pic=raw.get("pic", ""),
+                        )
 
                 if wp is None:
                     continue
 
-                # 判断类型
-                if wp.pool_type == "角色活动唤取":
+                # 判断类型（支持联动唤取）
+                if wp.pool_type in ("角色活动唤取", "角色联动唤取"):
                     ptype = "limited_char"
-                elif wp.pool_type == "武器活动唤取":
+                elif wp.pool_type in ("武器活动唤取", "武器联动唤取"):
                     ptype = "limited_weapon"
                 else:
                     continue
